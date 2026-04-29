@@ -26,6 +26,21 @@ REQ_FILE = ROOT / "requirements.txt"
 
 PYTHON = sys.executable
 
+# Charge .env le plus tôt possible pour que JARVIS_SERVER_URL, JARVIS_SECRET_TOKEN, etc.
+# soient disponibles dans os.environ avant tout subprocess.
+try:
+    from dotenv import load_dotenv
+    if ENV_FILE.exists():
+        load_dotenv(ENV_FILE)
+except ImportError:
+    # python-dotenv pas encore installé : fallback parser minimal pour ne pas bloquer
+    if ENV_FILE.exists():
+        for line in ENV_FILE.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
 
 def banner():
     print("═" * 60)
@@ -133,9 +148,19 @@ def run_agent(mode: str):
             sys.exit(1)
         os.environ["JARVIS_SERVER_URL"] = url
     if not os.getenv("JARVIS_DEVICE_ID"):
-        default_id = f"{os.uname().nodename if hasattr(os, 'uname') else os.environ.get('COMPUTERNAME', 'device')}".lower()
+        default_id = (
+            os.uname().nodename if hasattr(os, "uname")
+            else os.environ.get("COMPUTERNAME", "device")
+        ).lower()
         device_id = input(f"  device_id [{default_id}] : ").strip() or default_id
         os.environ["JARVIS_DEVICE_ID"] = device_id
+    if not os.getenv("JARVIS_SECRET_TOKEN"):
+        print("  [!] JARVIS_SECRET_TOKEN manquant. Mets-le dans .env ou exporte-le.")
+        sys.exit(1)
+
+    print(f"  URL        : {os.environ['JARVIS_SERVER_URL']}")
+    print(f"  Device     : {os.environ['JARVIS_DEVICE_ID']}")
+    print(f"  Token      : {'*' * 8} (chargé)")
 
     env = os.environ.copy()
     env["JARVIS_AGENT_MODE"] = mode

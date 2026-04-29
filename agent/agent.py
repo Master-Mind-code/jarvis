@@ -22,7 +22,22 @@ import platform
 from pathlib import Path
 
 # Ajoute la racine du projet au path pour importer server.tools.*
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+# Charge .env de la racine du projet pour que JARVIS_SERVER_URL etc. soient dispo
+ENV_FILE = ROOT / ".env"
+try:
+    from dotenv import load_dotenv
+    if ENV_FILE.exists():
+        load_dotenv(ENV_FILE)
+except ImportError:
+    if ENV_FILE.exists():
+        for line in ENV_FILE.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
 
 import websockets
 
