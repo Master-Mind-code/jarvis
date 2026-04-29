@@ -1,0 +1,42 @@
+# Secrets — JAMAIS commit
+.env
+.env.local
+.env.*.local
+*.key
+*_secret*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Environnements virtuels
+.venv/
+venv/
+env/
+ENV/
+
+# IDE / éditeurs
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Builds / artefacts
+dist/
+build/
+*.egg
+
+# Scripts de test perso (à toi de décider — décommente pour ignorer)
+# gem_api.py

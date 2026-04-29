@@ -1,0 +1,10 @@
+# Dépendances minimales pour un appareil en mode WORKER uniquement.
+# Le worker n'a pas besoin du serveur, du LLM ni de l'UI :
+# il reçoit des tool_request via WebSocket et exécute les tools localement.
+#
+# → Idéal pour Termux (Android), Raspberry Pi, ou tout appareil
+#   avec ressources limitées.
+#
+# Pour un déploiement complet (serveur central + UI), utilise requirements.txt.
+websockets>=13.0
+python-dotenv>=1.0.0
