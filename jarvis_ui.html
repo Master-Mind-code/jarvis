@@ -1419,21 +1419,47 @@ function pickFrenchVoice() {
 }
 
 function cleanForSpeech(text) {
-  return text
-    .replace(/```[\s\S]*?```/g, ' ')                       // blocs de code
-    .replace(/`([^`]+)`/g, '$1')                           // code inline
-    .replace(/!?\[([^\]]+)\]\([^)]+\)/g, '$1')             // liens / images markdown → texte du lien
-    .replace(/^#{1,6}\s+/gm, '')                           // titres
-    .replace(/\*{1,3}([^*]+)\*{1,3}/g, '$1')               // gras / italiques
-    .replace(/_{1,3}([^_]+)_{1,3}/g, '$1')                 // gras / italiques (underscore)
-    .replace(/^\s*[-*+]\s+/gm, '')                         // puces de liste
-    .replace(/^\s*\d+\.\s+/gm, '')                         // listes numérotées
-    .replace(/^\s*>\s+/gm, '')                             // citations
-    .replace(/—/g, ', ').replace(/–/g, ', ')               // tirets longs → pauses
-    .replace(/\n{2,}/g, '. ')                              // paragraphes → pause longue
-    .replace(/\n/g, ' ')
-    .replace(/\s{2,}/g, ' ')
-    .trim();
+  let t = text;
+
+  // 1. Blocs de code et code inline (souvent illisibles à voix haute)
+  t = t.replace(/```[\s\S]*?```/g, ' ');
+  t = t.replace(/`([^`]+)`/g, '$1');
+
+  // 2. Liens et images markdown : on garde le texte du lien
+  t = t.replace(/!?\[([^\]]+)\]\([^)]+\)/g, '$1');
+
+  // 3. Séparateurs horizontaux sur leur propre ligne : ---, ***, ___
+  t = t.replace(/^\s*[-*_]{3,}\s*$/gm, '');
+
+  // 4. EMOJIS et symboles pictographiques (lus littéralement par les voix Windows)
+  //    Couvre : émojis Unicode, drapeaux, dingbats, symboles divers
+  t = t.replace(/[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\u{2600}-\u{27BF}]/gu, ' ');
+  // Sélecteurs de variation et ZWJ qui restent après suppression des emojis
+  t = t.replace(/[‍️⃣]/g, '');
+  // Bullets Unicode (•, ‣, ▪, ▫, ◦, ★, ✓...)
+  t = t.replace(/[•‣◦▪▫★☆✓✔✗]/g, '');
+
+  // 5. Marqueurs markdown
+  t = t.replace(/^#{1,6}\s+/gm, '');                      // titres : ##, ###...
+  t = t.replace(/\*{1,3}([^*\n]+)\*{1,3}/g, '$1');        // **gras**, *italique*
+  t = t.replace(/_{2,3}([^_\n]+)_{2,3}/g, '$1');          // __gras__
+  t = t.replace(/^\s*[-*+]\s+/gm, '');                    // puces : -, *, +
+  t = t.replace(/^\s*\d+[.)]\s+/gm, '');                  // listes numérotées : 1., 2)
+  t = t.replace(/^\s*>\s+/gm, '');                        // citations : >
+
+  // 6. Tirets longs → pauses ; tirets isolés (entre espaces) → virgule
+  t = t.replace(/[—–]/g, ', ');
+  t = t.replace(/\s-\s/g, ', ');
+
+  // 7. Sauts de ligne → pauses
+  t = t.replace(/\n{2,}/g, '. ');
+  t = t.replace(/\n/g, ' ');
+
+  // 8. Nettoyage final
+  t = t.replace(/\s+([.,;:!?])/g, '$1');                  // espaces avant ponctuation
+  t = t.replace(/([.,;:!?]){2,}/g, '$1');                 // ponctuation dupliquée
+  t = t.replace(/\s{2,}/g, ' ');
+  return t.trim();
 }
 
 // Découpe un long texte en phrases pour que la synthèse n'ait pas de "blanc" final
