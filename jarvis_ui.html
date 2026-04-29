@@ -1120,6 +1120,27 @@ function pwdToggleMic() {
 window.addEventListener('load', () => document.getElementById('pwdInput').focus());
 
 // ═══════════════════════════════════════════════
+// AUTO-CONFIG : si l'UI est servie par le serveur (http://...),
+// on déduit l'URL WebSocket à partir de window.location → plus de saisie manuelle.
+// (L'utilisateur tape juste son token, ou même rien si on le pré-remplit ensuite.)
+// ═══════════════════════════════════════════════
+(function autoConfigServer() {
+  // Si on est en file://, on garde la valeur par défaut (l'utilisateur configurera)
+  if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
+  const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${wsProto}//${location.host}`;
+  const urlInput = document.getElementById('cfgUrl');
+  if (urlInput) urlInput.value = wsUrl;
+  // Device id par défaut basé sur le user-agent (mobile = "phone-chrome", desktop = "browser")
+  const ua = navigator.userAgent.toLowerCase();
+  const isMobile = /android|iphone|ipad|mobile/.test(ua);
+  const deviceInput = document.getElementById('cfgDevice');
+  if (deviceInput && deviceInput.value === 'browser') {
+    deviceInput.value = isMobile ? 'phone-browser' : 'browser';
+  }
+})();
+
+// ═══════════════════════════════════════════════
 // ÉTAT JARVIS
 // ═══════════════════════════════════════════════
 const stateTexts = {

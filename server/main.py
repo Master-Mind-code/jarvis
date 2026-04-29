@@ -13,13 +13,18 @@ import os
 import json
 import uuid
 import asyncio
+from pathlib import Path
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
 from dotenv import load_dotenv
 from server.orchestrator import process_request
 
 load_dotenv()
+
+ROOT_DIR = Path(__file__).resolve().parent.parent
+UI_FILE = ROOT_DIR / "jarvis_ui.html"
 
 SECRET_TOKEN = os.getenv("JARVIS_SECRET_TOKEN", "jarvis_secret_change_me")
 RPC_TIMEOUT = float(os.getenv("JARVIS_RPC_TIMEOUT", "60"))
@@ -41,7 +46,15 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
 
 
 @app.get("/")
-def root():
+def serve_ui():
+    """Sert l'UI Jarvis directement. Accessible depuis n'importe quel navigateur."""
+    if UI_FILE.exists():
+        return FileResponse(UI_FILE, media_type="text/html")
+    return JSONResponse({"error": "jarvis_ui.html introuvable à la racine du projet"}, status_code=404)
+
+
+@app.get("/status")
+def status():
     return {
         "status": "Jarvis online",
         "controllers": list(controllers.keys()),
