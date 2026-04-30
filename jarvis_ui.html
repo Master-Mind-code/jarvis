@@ -1,598 +1,1011 @@
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JARVIS</title>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Space+Grotesk:wght@300;400;500&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --cyan: #00d4ff;
-    --cyan-dim: #0066884d;
-    --cyan-glow: #00d4ff66;
-    --gold: #ffd700;
-    --green: #00ff88;
-    --red: #ff4466;
-    --bg: #06090f;
-    --bg2: #0d1425;
-    --bg3: #111b30;
-    --text: #c8e8ff;
-    --text-dim: #4a7a9b;
-    --border: #0d3a5a;
-  }
+/* ══════════════════════════════════════════════
+   TOKENS
+══════════════════════════════════════════════ */
+:root {
+  --cyan:       #00e5ff;
+  --cyan-dim:   rgba(0,229,255,0.08);
+  --cyan-glow:  rgba(0,229,255,0.4);
+  --violet:     oklch(0.55 0.16 295);
+  --gold:       #f5c518;
+  --green:      #00ffa3;
+  --red:        #ff3b5c;
+  --bg:         #04060d;
+  --bg2:        #080e1e;
+  --bg3:        rgba(6,14,32,0.72);
+  --text:       #b8d8f0;
+  --text-dim:   rgba(120,170,210,0.45);
+  --border:     rgba(0,229,255,0.1);
+  --border-hi:  rgba(0,229,255,0.35);
+  --panel-blur: blur(18px);
+}
 
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+/* ══════════════════════════════════════════════
+   RESET / BASE
+══════════════════════════════════════════════ */
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
 
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Rajdhani', sans-serif;
-    height: 100vh;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    position: relative;
-  }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Space Grotesk', sans-serif;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
 
-  /* Ambient background grid */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image:
-      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
-    background-size: 50px 50px;
-    pointer-events: none;
-    z-index: 0;
-  }
+/* ── Grille hexagonale en fond ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,229,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,229,255,0.025) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none;
+  z-index: 0;
+}
 
-  /* Header */
-  header {
-    position: relative;
-    z-index: 10;
-    width: 100%;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 16px 32px;
-    border-bottom: 1px solid var(--border);
-    background: linear-gradient(180deg, rgba(6,9,15,0.95) 0%, transparent 100%);
-  }
+/* ── Vignette ── */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(4,6,13,0.9) 100%);
+  pointer-events: none;
+  z-index: 0;
+}
 
-  .logo {
-    font-family: 'Orbitron', monospace;
-    font-weight: 900;
-    font-size: 22px;
-    letter-spacing: 8px;
-    color: var(--cyan);
-    text-shadow: 0 0 20px var(--cyan-glow), 0 0 40px var(--cyan-glow);
-  }
+/* ── Scanlines ── */
+.scanlines {
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.04) 2px,
+    rgba(0,0,0,0.04) 4px
+  );
+  pointer-events: none;
+  z-index: 1;
+}
 
-  .logo span { color: #ffffff; }
+/* ══════════════════════════════════════════════
+   CORNER BRACKETS — décoration HUD
+══════════════════════════════════════════════ */
+.hud-frame {
+  position: relative;
+}
+.hud-frame::before, .hud-frame::after,
+.hud-frame .corner-br, .hud-frame .corner-bl {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-color: var(--border-hi);
+  border-style: solid;
+  transition: border-color 0.3s;
+  z-index: 2;
+}
+.hud-frame::before  { top:0;    left:0;  border-width: 1.5px 0 0 1.5px; }
+.hud-frame::after   { top:0;    right:0; border-width: 1.5px 1.5px 0 0; }
+.hud-frame .corner-br { bottom:0; right:0; border-width: 0 1.5px 1.5px 0; }
+.hud-frame .corner-bl { bottom:0; left:0;  border-width: 0 0 1.5px 1.5px; }
 
-  .status-bar {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    font-size: 11px;
-    font-family: 'Orbitron', monospace;
-    letter-spacing: 2px;
-    color: var(--text-dim);
-  }
+/* ══════════════════════════════════════════════
+   HEADER
+══════════════════════════════════════════════ */
+header {
+  position: relative;
+  z-index: 20;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 32px;
+  height: 56px;
+  background: linear-gradient(180deg, rgba(4,6,13,0.98) 0%, rgba(4,6,13,0.6) 100%);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: var(--panel-blur);
+  flex-shrink: 0;
+}
 
-  .status-indicator {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
+.logo {
+  font-family: 'Orbitron', monospace;
+  font-weight: 900;
+  font-size: 20px;
+  letter-spacing: 10px;
+  color: var(--cyan);
+  text-shadow: 0 0 24px var(--cyan-glow), 0 0 60px rgba(0,229,255,0.15);
+  user-select: none;
+}
+.logo em { color: rgba(255,255,255,0.9); font-style: normal; }
 
-  .status-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--cyan);
-    box-shadow: 0 0 8px var(--cyan);
-    animation: pulse-dot 2s ease-in-out infinite;
-  }
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
 
-  @keyframes pulse-dot {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.4; transform: scale(0.7); }
-  }
+.live-clock {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+  min-width: 80px;
+  text-align: right;
+}
 
-  .connection-status {
-    font-size: 10px;
-    padding: 3px 10px;
-    border: 1px solid var(--border);
-    border-radius: 2px;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-  }
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  border-radius: 2px;
+  font-family: 'Orbitron', monospace;
+  font-size: 9px;
+  letter-spacing: 2.5px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  transition: all 0.3s;
+  cursor: default;
+}
+.status-pill.connected { border-color: rgba(0,255,163,0.35); color: var(--green); }
+.status-pill.connected .s-dot { background: var(--green); box-shadow: 0 0 8px var(--green); }
 
-  .connection-status.connected { color: var(--green); border-color: var(--green); }
-  .connection-status.disconnected { color: var(--red); border-color: var(--red); }
+.s-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(120,170,210,0.4);
+  animation: pulse-dot 2.5s ease-in-out infinite;
+  flex-shrink: 0;
+}
+@keyframes pulse-dot {
+  0%,100% { opacity:1; transform:scale(1); }
+  50%      { opacity:0.35; transform:scale(0.6); }
+}
 
-  /* Main layout */
-  .main {
-    position: relative;
-    z-index: 5;
-    flex: 1;
-    width: 100%;
-    display: flex;
-    gap: 0;
-    overflow: hidden;
-  }
+.state-label {
+  font-family: 'Orbitron', monospace;
+  font-size: 9px;
+  letter-spacing: 2.5px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  min-width: 90px;
+  text-align: center;
+}
 
-  /* Sphere zone */
-  .sphere-zone {
-    width: 420px;
-    min-width: 420px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    border-right: 1px solid var(--border);
-  }
+.btn-cfg {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  border-radius: 2px;
+  cursor: pointer;
+  color: var(--text-dim);
+  transition: all 0.2s;
+  flex-shrink: 0;
+  backdrop-filter: var(--panel-blur);
+}
+.btn-cfg:hover { border-color: var(--border-hi); color: var(--cyan); background: rgba(0,229,255,0.06); }
+.btn-cfg svg { width: 15px; height: 15px; }
 
-  #sphereCanvas {
-    display: block;
-    cursor: default;
-  }
+/* ══════════════════════════════════════════════
+   MAIN LAYOUT
+══════════════════════════════════════════════ */
+.main {
+  position: relative;
+  z-index: 5;
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
 
-  .sphere-label {
-    font-family: 'Orbitron', monospace;
-    font-size: 11px;
-    letter-spacing: 4px;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    margin-top: -20px;
-    text-align: center;
-  }
+/* ══════════════════════════════════════════════
+   SPHERE ZONE
+══════════════════════════════════════════════ */
+.sphere-zone {
+  width: 400px;
+  min-width: 400px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  border-right: 1px solid var(--border);
+  background: linear-gradient(135deg, rgba(4,6,13,0) 0%, rgba(0,229,255,0.015) 100%);
+  gap: 0;
+  overflow: hidden;
+}
 
-  .sphere-state-text {
-    font-family: 'Orbitron', monospace;
-    font-size: 13px;
-    letter-spacing: 3px;
-    color: var(--cyan);
-    text-shadow: 0 0 10px var(--cyan-glow);
-    text-transform: uppercase;
-    margin-top: 8px;
-    height: 20px;
-    text-align: center;
-    transition: all 0.4s;
-  }
+/* Gradient bas sphère */
+.sphere-zone::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 100px;
+  background: linear-gradient(0deg, var(--bg) 0%, transparent 100%);
+  pointer-events: none;
+  z-index: 3;
+}
 
-  /* Scan lines on sphere zone */
-  .sphere-zone::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 120px;
-    background: linear-gradient(0deg, var(--bg) 0%, transparent 100%);
-    pointer-events: none;
-    z-index: 2;
-  }
+/* Anneau décoratif rotatif autour de la sphère */
+.ring-outer {
+  position: absolute;
+  width: 360px;
+  height: 360px;
+  border-radius: 50%;
+  border: 1px solid rgba(0,229,255,0.08);
+  animation: ring-spin 20s linear infinite;
+  pointer-events: none;
+  z-index: 2;
+}
+.ring-outer::before {
+  content: '';
+  position: absolute;
+  top: -1px; left: 20%;
+  width: 60%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+  border-radius: 50%;
+  box-shadow: 0 0 12px var(--cyan-glow);
+}
+@keyframes ring-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
-  /* Chat zone */
-  .chat-zone {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
+.ring-mid {
+  position: absolute;
+  width: 290px;
+  height: 290px;
+  border-radius: 50%;
+  border: 1px dashed rgba(0,229,255,0.06);
+  animation: ring-spin 35s linear infinite reverse;
+  pointer-events: none;
+  z-index: 2;
+}
 
-  /* Chat messages */
-  #chat {
-    flex: 1;
-    overflow-y: auto;
-    padding: 24px 28px;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    scrollbar-width: thin;
-    scrollbar-color: var(--border) transparent;
-  }
+/* HUD readouts */
+.hud-readout {
+  position: absolute;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+  line-height: 1.8;
+  z-index: 4;
+}
+.hud-readout.top-left  { top: 20px; left: 20px; }
+.hud-readout.top-right { top: 20px; right: 20px; text-align: right; }
+.hud-readout.bot-left  { bottom: 110px; left: 20px; }
+.hud-readout.bot-right { bottom: 110px; right: 20px; text-align: right; }
 
-  #chat::-webkit-scrollbar { width: 4px; }
-  #chat::-webkit-scrollbar-track { background: transparent; }
-  #chat::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.hud-val {
+  color: var(--cyan);
+  font-size: 10px;
+}
 
-  .msg {
-    display: flex;
-    gap: 12px;
-    animation: msg-appear 0.3s ease-out;
-  }
+/* Canvas sphère */
+#sphereCanvas {
+  display: block;
+  position: relative;
+  z-index: 2;
+  margin-top: -16px;
+}
 
-  @keyframes msg-appear {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
+/* État sous la sphère */
+.sphere-footer {
+  position: relative;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-top: -28px;
+}
+.sphere-shape-label {
+  font-family: 'Orbitron', monospace;
+  font-size: 8px;
+  letter-spacing: 4px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+.sphere-state-text {
+  font-family: 'Orbitron', monospace;
+  font-size: 11px;
+  letter-spacing: 4px;
+  color: var(--cyan);
+  text-shadow: 0 0 12px var(--cyan-glow);
+  text-transform: uppercase;
+  transition: color 0.4s, text-shadow 0.4s;
+  height: 18px;
+}
 
-  .msg.user { flex-direction: row-reverse; }
+/* Barre d'énergie */
+.energy-bar-wrap {
+  position: absolute;
+  bottom: 24px;
+  left: 24px;
+  right: 24px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.energy-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.energy-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  color: var(--text-dim);
+  min-width: 56px;
+  text-transform: uppercase;
+}
+.energy-track {
+  flex: 1;
+  height: 2px;
+  background: rgba(0,229,255,0.06);
+  border-radius: 1px;
+  overflow: hidden;
+}
+.energy-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--cyan), rgba(0,229,255,0.6));
+  border-radius: 1px;
+  transition: width 0.8s ease;
+  box-shadow: 0 0 6px var(--cyan-glow);
+}
+.energy-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  color: var(--cyan);
+  min-width: 32px;
+  text-align: right;
+}
 
-  .msg-avatar {
-    width: 32px;
-    height: 32px;
-    border-radius: 2px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: 'Orbitron', monospace;
-    font-size: 10px;
-    font-weight: 700;
-    flex-shrink: 0;
-    margin-top: 2px;
-  }
+/* ══════════════════════════════════════════════
+   CHAT ZONE
+══════════════════════════════════════════════ */
+.chat-zone {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 
-  .msg.user .msg-avatar {
-    background: linear-gradient(135deg, #0d3a5a, #1a5a8a);
-    border: 1px solid var(--cyan);
-    color: var(--cyan);
-  }
+/* Fil messages */
+#chat {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0,229,255,0.12) transparent;
+}
+#chat::-webkit-scrollbar { width: 3px; }
+#chat::-webkit-scrollbar-track { background: transparent; }
+#chat::-webkit-scrollbar-thumb { background: rgba(0,229,255,0.15); border-radius: 2px; }
 
-  .msg.jarvis .msg-avatar {
-    background: linear-gradient(135deg, #0d1a2a, #0a2540);
-    border: 1px solid rgba(0,212,255,0.3);
-    color: rgba(0,212,255,0.7);
-  }
+/* Message */
+.msg {
+  display: flex;
+  gap: 14px;
+  animation: msg-in 0.35s cubic-bezier(0.22,1,0.36,1);
+}
+@keyframes msg-in {
+  from { opacity:0; transform: translateY(14px); }
+  to   { opacity:1; transform: translateY(0); }
+}
 
-  .msg-content {
-    max-width: 75%;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
+.msg.user { flex-direction: row-reverse; }
 
-  .msg-sender {
-    font-family: 'Orbitron', monospace;
-    font-size: 9px;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-  }
+.msg-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Orbitron', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 4px;
+  letter-spacing: 0;
+}
+.msg.jarvis .msg-avatar {
+  background: rgba(0,229,255,0.06);
+  border: 1px solid rgba(0,229,255,0.2);
+  color: var(--cyan);
+}
+.msg.user .msg-avatar {
+  background: rgba(123,94,167,0.12);
+  border: 1px solid rgba(123,94,167,0.3);
+  color: var(--violet);
+}
 
-  .msg.user .msg-sender { color: var(--cyan); text-align: right; }
-  .msg.jarvis .msg-sender { color: var(--text-dim); }
+.msg-content {
+  max-width: 72%;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.msg.user .msg-content { align-items: flex-end; }
 
-  .msg-text {
-    padding: 10px 14px;
-    border-radius: 2px;
-    font-size: 14px;
-    font-weight: 400;
-    line-height: 1.6;
-    white-space: pre-wrap;
-    word-break: break-word;
-  }
+.msg-sender {
+  font-family: 'Orbitron', monospace;
+  font-size: 8px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+}
+.msg.jarvis .msg-sender { color: rgba(0,229,255,0.45); }
+.msg.user  .msg-sender  { color: rgba(123,94,167,0.6); }
 
-  .msg.user .msg-text {
-    background: rgba(0,100,180,0.2);
-    border: 1px solid rgba(0,212,255,0.3);
-    color: #e0f4ff;
-    text-align: right;
-  }
+.msg-text {
+  padding: 12px 16px;
+  font-size: 13.5px;
+  font-weight: 400;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border-radius: 0;
+  position: relative;
+}
 
-  .msg.jarvis .msg-text {
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-left: 2px solid var(--cyan);
-  }
+.msg.jarvis .msg-text {
+  background: rgba(5,12,28,0.7);
+  border: 1px solid var(--border);
+  border-left: 1.5px solid var(--cyan);
+  color: var(--text);
+  backdrop-filter: var(--panel-blur);
+}
 
-  /* Tool action chips */
-  .tool-action {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 10px;
-    font-family: 'Orbitron', monospace;
-    letter-spacing: 1px;
-    padding: 3px 8px;
-    border-radius: 2px;
-    margin: 4px 2px;
-    text-transform: uppercase;
-  }
+.msg.user .msg-text {
+  background: rgba(123,94,167,0.07);
+  border: 1px solid rgba(123,94,167,0.18);
+  border-right: 1.5px solid var(--violet);
+  color: rgba(200,220,240,0.9);
+  text-align: right;
+}
 
-  .tool-action.ok {
-    background: rgba(0,255,136,0.08);
-    border: 1px solid rgba(0,255,136,0.3);
-    color: var(--green);
-  }
+/* Thinking */
+.thinking {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: rgba(5,12,28,0.7);
+  border: 1px solid var(--border);
+  border-left: 1.5px solid var(--cyan);
+  backdrop-filter: var(--panel-blur);
+  font-family: 'Orbitron', monospace;
+  font-size: 9px;
+  letter-spacing: 2.5px;
+  color: rgba(0,229,255,0.55);
+  text-transform: uppercase;
+}
+.thinking-dots span {
+  display: inline-block;
+  width: 3px;
+  height: 3px;
+  background: var(--cyan);
+  border-radius: 50%;
+  margin: 0 2px;
+  animation: bounce 1.2s ease-in-out infinite;
+}
+.thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+.thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes bounce {
+  0%,80%,100% { transform:translateY(0); opacity:0.35; }
+  40%          { transform:translateY(-5px); opacity:1; }
+}
 
-  .tool-action.err {
-    background: rgba(255,68,102,0.08);
-    border: 1px solid rgba(255,68,102,0.3);
-    color: var(--red);
-  }
+/* Tool chips */
+.tool-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9px;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.5px;
+  padding: 2px 8px;
+  border-radius: 2px;
+  margin: 3px 2px 0;
+  text-transform: uppercase;
+}
+.tool-action.ok  { background: rgba(0,255,163,0.05); border: 1px solid rgba(0,255,163,0.25); color: var(--green); }
+.tool-action.err { background: rgba(255,59,92,0.05);  border: 1px solid rgba(255,59,92,0.25);  color: var(--red); }
+.tool-dot { width:4px; height:4px; border-radius:50%; flex-shrink:0; }
+.ok  .tool-dot { background: var(--green); }
+.err .tool-dot { background: var(--red); }
 
-  .tool-dot { width: 5px; height: 5px; border-radius: 50%; }
-  .ok .tool-dot { background: var(--green); }
-  .err .tool-dot { background: var(--red); }
+/* Message système */
+.sys-msg {
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--text-dim);
+  padding: 4px 0;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.sys-msg::before, .sys-msg::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
 
-  /* Thinking indicator */
-  .thinking {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 14px;
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-left: 2px solid var(--cyan);
-    border-radius: 2px;
-    font-size: 12px;
-    font-family: 'Orbitron', monospace;
-    letter-spacing: 2px;
-    color: var(--cyan);
-    text-transform: uppercase;
-  }
+/* ══════════════════════════════════════════════
+   INPUT BAR
+══════════════════════════════════════════════ */
+.input-bar {
+  padding: 14px 24px 18px;
+  border-top: 1px solid var(--border);
+  background: linear-gradient(0deg, rgba(4,6,13,0.98) 0%, rgba(4,6,13,0.7) 100%);
+  backdrop-filter: var(--panel-blur);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
 
-  .thinking-dots span {
-    display: inline-block;
-    width: 4px;
-    height: 4px;
-    background: var(--cyan);
-    border-radius: 50%;
-    margin: 0 2px;
-    animation: bounce 1.2s ease-in-out infinite;
-  }
+.input-wrap {
+  flex: 1;
+  position: relative;
+}
 
-  .thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
-  .thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+#textInput {
+  width: 100%;
+  background: rgba(5,12,28,0.8);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  color: var(--text);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 14px;
+  padding: 11px 16px;
+  outline: none;
+  transition: border-color 0.25s, box-shadow 0.25s;
+  caret-color: var(--cyan);
+  letter-spacing: 0.2px;
+  backdrop-filter: var(--panel-blur);
+}
+#textInput:focus {
+  border-color: rgba(0,229,255,0.4);
+  box-shadow: 0 0 0 2px rgba(0,229,255,0.06), inset 0 0 20px rgba(0,229,255,0.02);
+}
+#textInput::placeholder { color: rgba(120,170,210,0.3); }
 
-  @keyframes bounce {
-    0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
-    40% { transform: translateY(-5px); opacity: 1; }
-  }
+/* Indicateur focus */
+.input-wrap::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0;
+  width: 0; height: 1.5px;
+  background: linear-gradient(90deg, var(--cyan), transparent);
+  transition: width 0.3s ease;
+}
+.input-wrap:focus-within::after { width: 100%; }
 
-  /* Input bar */
-  .input-bar {
-    padding: 16px 28px;
-    border-top: 1px solid var(--border);
-    background: var(--bg);
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
+.btn-action {
+  width: 42px;
+  height: 42px;
+  border-radius: 2px;
+  border: 1px solid var(--border);
+  background: rgba(5,12,28,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  color: var(--text-dim);
+  backdrop-filter: var(--panel-blur);
+}
+.btn-action:hover { border-color: var(--border-hi); color: var(--cyan); background: rgba(0,229,255,0.06); }
+.btn-action:active { transform: scale(0.93); }
+.btn-action svg { width: 17px; height: 17px; stroke: currentColor; }
 
-  #textInput {
-    flex: 1;
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 2px;
-    color: var(--text);
-    font-family: 'Rajdhani', sans-serif;
-    font-size: 15px;
-    padding: 10px 16px;
-    outline: none;
-    transition: border-color 0.2s, box-shadow 0.2s;
-    caret-color: var(--cyan);
-  }
+#micBtn.listening {
+  border-color: rgba(255,59,92,0.5);
+  color: var(--red);
+  background: rgba(255,59,92,0.08);
+  animation: mic-pulse 0.9s ease-in-out infinite alternate;
+}
+@keyframes mic-pulse {
+  from { box-shadow: 0 0 0 0 rgba(255,59,92,0.3); }
+  to   { box-shadow: 0 0 0 8px rgba(255,59,92,0); }
+}
 
-  #textInput:focus {
-    border-color: rgba(0,212,255,0.5);
-    box-shadow: 0 0 0 2px rgba(0,212,255,0.08);
-  }
+#sendBtn {
+  border-color: rgba(0,229,255,0.3);
+  color: var(--cyan);
+  background: rgba(0,229,255,0.06);
+}
+#sendBtn:hover { background: rgba(0,229,255,0.14); box-shadow: 0 0 16px rgba(0,229,255,0.15); }
 
-  #textInput::placeholder { color: var(--text-dim); }
+/* ══════════════════════════════════════════════
+   CONFIG PANEL
+══════════════════════════════════════════════ */
+.config-panel {
+  position: fixed;
+  top: 56px;
+  right: 0;
+  width: 300px;
+  height: calc(100vh - 56px);
+  background: rgba(6,10,22,0.95);
+  border-left: 1px solid var(--border);
+  padding: 24px 20px;
+  z-index: 100;
+  transform: translateX(100%);
+  transition: transform 0.35s cubic-bezier(0.22,1,0.36,1);
+  backdrop-filter: var(--panel-blur);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow-y: auto;
+}
+.config-panel.open { transform: translateX(0); }
 
-  .btn-icon {
-    width: 42px;
-    height: 42px;
-    border-radius: 2px;
-    border: 1px solid var(--border);
-    background: var(--bg3);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.2s;
-    position: relative;
-    overflow: hidden;
-    flex-shrink: 0;
-  }
+.cfg-title {
+  font-family: 'Orbitron', monospace;
+  font-size: 10px;
+  letter-spacing: 4px;
+  color: var(--cyan);
+  text-transform: uppercase;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 20px;
+}
 
-  .btn-icon:hover { border-color: rgba(0,212,255,0.5); background: rgba(0,212,255,0.06); }
-  .btn-icon:active { transform: scale(0.95); }
+.cfg-label {
+  font-family: 'Orbitron', monospace;
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  margin-top: 16px;
+}
+.cfg-label:first-of-type { margin-top: 0; }
 
-  .btn-icon svg { width: 18px; height: 18px; }
+.config-panel input {
+  width: 100%;
+  background: rgba(4,6,13,0.8);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  padding: 8px 12px;
+  outline: none;
+  letter-spacing: 0.5px;
+  transition: border-color 0.2s;
+}
+.config-panel input:focus { border-color: rgba(0,229,255,0.4); }
 
-  #micBtn.listening {
-    border-color: var(--red);
-    background: rgba(255,68,102,0.12);
-    animation: mic-pulse 0.8s ease-in-out infinite alternate;
-  }
+.cfg-btns { margin-top: 24px; display: flex; flex-direction: column; gap: 8px; }
 
-  @keyframes mic-pulse {
-    from { box-shadow: 0 0 0 0 rgba(255,68,102,0.4); }
-    to { box-shadow: 0 0 0 8px rgba(255,68,102,0); }
-  }
+.btn-cfg-action {
+  width: 100%;
+  padding: 10px;
+  border-radius: 2px;
+  font-family: 'Orbitron', monospace;
+  font-size: 9px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid rgba(0,229,255,0.3);
+  background: rgba(0,229,255,0.06);
+  color: var(--cyan);
+}
+.btn-cfg-action:hover { background: rgba(0,229,255,0.14); }
+.btn-cfg-action.danger {
+  border-color: rgba(255,59,92,0.3);
+  background: rgba(255,59,92,0.05);
+  color: var(--red);
+}
+.btn-cfg-action.danger:hover { background: rgba(255,59,92,0.12); }
 
-  #sendBtn {
-    border-color: rgba(0,212,255,0.4);
-    background: rgba(0,212,255,0.08);
-  }
+/* ══════════════════════════════════════════════
+   PASSWORD GATE
+══════════════════════════════════════════════ */
+.password-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: radial-gradient(ellipse at 50% 50%, #080e1e 0%, #04060d 65%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.7s ease;
+}
+.password-gate.hidden { opacity:0; pointer-events:none; }
 
-  #sendBtn:hover {
-    background: rgba(0,212,255,0.18);
-    box-shadow: 0 0 12px rgba(0,212,255,0.2);
-  }
+/* Animated grid in gate */
+.gate-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+  background-size: 56px 56px;
+  animation: grid-drift 8s linear infinite;
+  pointer-events: none;
+}
+@keyframes grid-drift {
+  0%   { background-position: 0 0; }
+  100% { background-position: 56px 56px; }
+}
 
-  /* Config panel */
-  .config-panel {
-    position: fixed;
-    top: 60px;
-    right: 0;
-    width: 280px;
-    background: var(--bg2);
-    border-left: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
-    padding: 16px;
-    z-index: 100;
-    transform: translateX(100%);
-    transition: transform 0.3s ease;
-    font-size: 13px;
-  }
+.pwd-box {
+  position: relative;
+  background: rgba(6,12,26,0.85);
+  border: 1px solid var(--border);
+  box-shadow:
+    0 0 80px rgba(0,229,255,0.08),
+    0 0 200px rgba(0,229,255,0.04),
+    inset 0 0 40px rgba(0,229,255,0.02);
+  padding: 44px 48px;
+  min-width: 380px;
+  text-align: center;
+  backdrop-filter: blur(24px);
+}
 
-  .config-panel.open { transform: translateX(0); }
+.pwd-logo {
+  font-family: 'Orbitron', monospace;
+  font-weight: 900;
+  font-size: 36px;
+  letter-spacing: 14px;
+  color: var(--cyan);
+  text-shadow: 0 0 30px var(--cyan-glow), 0 0 80px rgba(0,229,255,0.12);
+  margin-bottom: 6px;
+  position: relative;
+  display: inline-block;
+}
+.pwd-logo em { color: rgba(255,255,255,0.92); font-style: normal; }
 
-  .config-label {
-    font-family: 'Orbitron', monospace;
-    font-size: 9px;
-    letter-spacing: 2px;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    margin-bottom: 6px;
-    margin-top: 12px;
-  }
+/* Scan animation sur logo */
+.pwd-logo::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+  animation: logo-scan 3s ease-in-out infinite;
+  opacity: 0.7;
+}
+@keyframes logo-scan {
+  0%   { top: 0%; opacity:0; }
+  10%  { opacity: 0.7; }
+  90%  { opacity: 0.7; }
+  100% { top: 100%; opacity:0; }
+}
 
-  .config-panel input {
-    width: 100%;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 2px;
-    color: var(--text);
-    font-family: 'Rajdhani', sans-serif;
-    font-size: 13px;
-    padding: 6px 10px;
-    outline: none;
-  }
+.pwd-sub {
+  font-family: 'Orbitron', monospace;
+  font-size: 8px;
+  letter-spacing: 4px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  margin-bottom: 36px;
+}
 
-  .config-panel input:focus { border-color: rgba(0,212,255,0.4); }
+.pwd-divider {
+  width: 48px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+  margin: 0 auto 32px;
+}
 
-  .btn-connect {
-    width: 100%;
-    margin-top: 14px;
-    padding: 8px;
-    background: rgba(0,212,255,0.1);
-    border: 1px solid rgba(0,212,255,0.4);
-    border-radius: 2px;
-    color: var(--cyan);
-    font-family: 'Orbitron', monospace;
-    font-size: 10px;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
+#pwdInput {
+  width: 100%;
+  background: rgba(4,6,13,0.8);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 18px;
+  padding: 12px 16px;
+  text-align: center;
+  letter-spacing: 6px;
+  outline: none;
+  transition: border-color 0.25s, box-shadow 0.25s;
+  caret-color: var(--cyan);
+}
+#pwdInput:focus {
+  border-color: rgba(0,229,255,0.45);
+  box-shadow: 0 0 20px rgba(0,229,255,0.1);
+}
 
-  .btn-connect:hover { background: rgba(0,212,255,0.2); }
+.pwd-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+.pwd-btn {
+  flex: 1;
+  padding: 11px;
+  background: rgba(0,229,255,0.06);
+  border: 1px solid rgba(0,229,255,0.3);
+  border-radius: 2px;
+  color: var(--cyan);
+  font-family: 'Orbitron', monospace;
+  font-size: 9px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.pwd-btn:hover { background: rgba(0,229,255,0.14); }
+.pwd-btn.listening {
+  border-color: rgba(255,59,92,0.45);
+  background: rgba(255,59,92,0.08);
+  color: var(--red);
+  animation: pulse-mic 1s infinite;
+}
+@keyframes pulse-mic {
+  0%,100% { box-shadow: 0 0 0 0 rgba(255,59,92,0.3); }
+  50%      { box-shadow: 0 0 0 8px rgba(255,59,92,0); }
+}
 
-  #cfgBtn { font-size: 18px; }
+.pwd-hint {
+  margin-top: 18px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  color: var(--text-dim);
+  min-height: 16px;
+}
+.pwd-hint.error   { color: var(--red); }
+.pwd-hint.success { color: var(--green); }
 
-  /* Responsive */
-  @media (max-width: 768px) {
-    .sphere-zone { width: 100%; min-width: unset; height: 260px; border-right: none; border-bottom: 1px solid var(--border); }
-    .main { flex-direction: column; }
-    #sphereCanvas { width: 100% !important; height: 240px !important; }
-  }
+/* ══════════════════════════════════════════════
+   STATE COLORS
+══════════════════════════════════════════════ */
+.state--listening  .sphere-state-text { color: var(--red)!important; text-shadow: 0 0 12px rgba(255,59,92,0.5)!important; }
+.state--processing .sphere-state-text { color: var(--gold)!important; text-shadow: 0 0 12px rgba(245,197,24,0.5)!important; }
+.state--speaking   .sphere-state-text { color: var(--green)!important; text-shadow: 0 0 12px rgba(0,255,163,0.5)!important; }
 
-  /* Password gate */
-  .password-gate {
-    position: fixed; inset: 0; z-index: 1000;
-    background: radial-gradient(circle at center, #0d1425 0%, #06090f 60%);
-    display: flex; align-items: center; justify-content: center;
-    transition: opacity 0.6s ease;
-  }
-  .password-gate.hidden { opacity: 0; pointer-events: none; }
-  .pwd-box {
-    background: rgba(13,20,37,0.85);
-    border: 1px solid var(--border);
-    box-shadow: 0 0 60px rgba(0,212,255,0.15), inset 0 0 30px rgba(0,212,255,0.04);
-    padding: 36px 40px;
-    min-width: 360px;
-    text-align: center;
-    backdrop-filter: blur(8px);
-  }
-  .pwd-logo {
-    font-family: 'Orbitron', monospace; font-weight: 900; font-size: 26px;
-    letter-spacing: 10px; color: var(--cyan);
-    text-shadow: 0 0 20px var(--cyan-glow), 0 0 40px var(--cyan-glow);
-    margin-bottom: 8px;
-  }
-  .pwd-logo span { color: #fff; }
-  .pwd-prompt {
-    font-family: 'Orbitron', monospace; font-size: 10px;
-    letter-spacing: 4px; color: var(--text-dim);
-    text-transform: uppercase; margin-bottom: 24px;
-  }
-  #pwdInput {
-    width: 100%; background: var(--bg); border: 1px solid var(--border);
-    color: var(--text); font-family: 'Rajdhani', sans-serif; font-size: 16px;
-    padding: 10px 14px; text-align: center; letter-spacing: 4px;
-    outline: none; border-radius: 2px;
-  }
-  #pwdInput:focus { border-color: rgba(0,212,255,0.5); box-shadow: 0 0 12px rgba(0,212,255,0.15); }
-  .pwd-actions { display: flex; gap: 10px; margin-top: 16px; }
-  .pwd-btn {
-    flex: 1; padding: 10px; background: rgba(0,212,255,0.1);
-    border: 1px solid rgba(0,212,255,0.4); border-radius: 2px;
-    color: var(--cyan); font-family: 'Orbitron', monospace;
-    font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
-    cursor: pointer; transition: all 0.2s;
-  }
-  .pwd-btn:hover { background: rgba(0,212,255,0.2); }
-  .pwd-btn.listening {
-    background: rgba(255,68,102,0.15); border-color: rgba(255,68,102,0.5); color: var(--red);
-    animation: pulse-mic 1s infinite;
-  }
-  @keyframes pulse-mic {
-    0%,100% { box-shadow: 0 0 0 0 rgba(255,68,102,0.4); }
-    50% { box-shadow: 0 0 0 8px rgba(255,68,102,0); }
-  }
-  .pwd-hint {
-    margin-top: 16px; font-size: 11px; color: var(--text-dim);
-    font-family: 'Orbitron', monospace; letter-spacing: 1px;
-  }
-  .pwd-hint.error { color: var(--red); }
-  .pwd-hint.success { color: var(--green); }
-
-  /* Shape indicator */
-  .shape-indicator {
-    position: absolute; top: 12px; right: 12px;
-    font-family: 'Orbitron', monospace; font-size: 9px; letter-spacing: 2px;
-    color: var(--cyan); opacity: 0.6; text-transform: uppercase;
-  }
+/* ══════════════════════════════════════════════
+   RESPONSIVE
+══════════════════════════════════════════════ */
+@media (max-width: 820px) {
+  .sphere-zone { width:100%; min-width:unset; height:260px; border-right:none; border-bottom:1px solid var(--border); }
+  .main { flex-direction:column; }
+  #sphereCanvas { width:100%!important; height:240px!important; }
+  .ring-outer, .ring-mid { display:none; }
+}
 </style>
 </head>
 <body>
 
-<!-- Password Gate (bloque l'accès tant que le bon mot de passe n'est pas saisi) -->
+<div class="scanlines"></div>
+
+<!-- ═══════════════════════════════════════════════
+     PASSWORD GATE
+════════════════════════════════════════════════ -->
 <div class="password-gate" id="passwordGate">
-  <div class="pwd-box">
-    <div class="pwd-logo">JAR<span>VIS</span></div>
-    <div class="pwd-prompt">Authentification — Identification vocale ou écrite</div>
-    <input type="password" id="pwdInput" placeholder="● ● ● ● ● ●" autocomplete="off"/>
+  <div class="gate-grid"></div>
+  <div class="pwd-box hud-frame">
+    <div class="corner-br"></div><div class="corner-bl"></div>
+    <div class="pwd-logo">JAR<em>VIS</em></div>
+    <div class="pwd-sub">Système d'IA personnel — Authentification requise</div>
+    <div class="pwd-divider"></div>
+    <input type="password" id="pwdInput" placeholder="· · · · · ·" autocomplete="off"/>
     <div class="pwd-actions">
       <button class="pwd-btn" onclick="checkPassword()">Déverrouiller</button>
-      <button class="pwd-btn" id="pwdMicBtn" onclick="pwdToggleMic()">🎤 Voix</button>
+      <button class="pwd-btn" id="pwdMicBtn" onclick="pwdToggleMic()">Voix</button>
     </div>
     <div class="pwd-hint" id="pwdHint">Saisis ou prononce le mot de passe</div>
   </div>
 </div>
 
+<!-- ═══════════════════════════════════════════════
+     HEADER
+════════════════════════════════════════════════ -->
 <header>
-  <div class="logo">JAR<span>VIS</span></div>
-  <div class="status-bar">
-    <div class="status-indicator">
-      <div class="status-dot"></div>
-      <span id="stateLabel">EN ATTENTE</span>
+  <div class="logo">JAR<em>VIS</em></div>
+  <div class="header-right">
+    <div class="live-clock" id="liveClock">--:--:--</div>
+    <div class="state-label" id="stateLabel">STANDBY</div>
+    <div class="status-pill" id="connStatus">
+      <div class="s-dot"></div>
+      <span id="connText">HORS LIGNE</span>
     </div>
-    <span id="connStatus" class="connection-status disconnected">HORS LIGNE</span>
-    <button class="btn-icon" id="cfgBtn" title="Paramètres" onclick="toggleConfig()">⚙</button>
+    <button class="btn-cfg" title="Paramètres" onclick="toggleConfig()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    </button>
   </div>
 </header>
 
-<div class="main">
+<!-- ═══════════════════════════════════════════════
+     MAIN
+════════════════════════════════════════════════ -->
+<div class="main" id="mainLayout">
+
+  <!-- Sphère -->
   <div class="sphere-zone">
+    <div class="ring-outer"></div>
+    <div class="ring-mid"></div>
+
+    <!-- Readouts HUD -->
+    <div class="hud-readout top-left">
+      SYS / NEURAL<br>
+      LOAD&nbsp;&nbsp;<span class="hud-val" id="hudLoad">72%</span><br>
+      TEMP&nbsp;&nbsp;<span class="hud-val" id="hudTemp">38°C</span>
+    </div>
+    <div class="hud-readout top-right">
+      RÉSEAU<br>
+      LAT&nbsp;&nbsp;&nbsp;<span class="hud-val" id="hudLat">12ms</span><br>
+      PKT&nbsp;&nbsp;&nbsp;<span class="hud-val" id="hudPkt">99.8%</span>
+    </div>
+    <div class="hud-readout bot-left">
+      ROT&nbsp;&nbsp;<span class="hud-val" id="hudRot">0.00</span><br>
+      FREQ&nbsp;<span class="hud-val" id="hudFreq">1.4kHz</span>
+    </div>
+    <div class="hud-readout bot-right">
+      SHAPE<br>
+      <span class="hud-val" id="shapeIndicator">SPHÈRE</span>
+    </div>
+
     <canvas id="sphereCanvas"></canvas>
-    <div class="shape-indicator" id="shapeIndicator">SPHÈRE</div>
-    <div class="sphere-label">Réseau neuronal IA</div>
-    <div class="sphere-state-text" id="sphereStateText">STANDBY</div>
+
+    <div class="sphere-footer">
+      <div class="sphere-shape-label">Réseau neuronal IA</div>
+      <div class="sphere-state-text" id="sphereStateText">STANDBY</div>
+    </div>
+
+    <!-- Barres d'énergie -->
+    <div class="energy-bar-wrap">
+      <div class="energy-row">
+        <div class="energy-label">NEURAL</div>
+        <div class="energy-track"><div class="energy-fill" id="efNeural" style="width:72%"></div></div>
+        <div class="energy-val" id="evNeural">72%</div>
+      </div>
+      <div class="energy-row">
+        <div class="energy-label">VOICE</div>
+        <div class="energy-track"><div class="energy-fill" id="efVoice" style="width:0%"></div></div>
+        <div class="energy-val" id="evVoice">0%</div>
+      </div>
+      <div class="energy-row">
+        <div class="energy-label">NET</div>
+        <div class="energy-track"><div class="energy-fill" id="efNet" style="width:35%"></div></div>
+        <div class="energy-val" id="evNet">35%</div>
+      </div>
+    </div>
   </div>
 
+  <!-- Chat -->
   <div class="chat-zone">
     <div id="chat">
       <div class="msg jarvis">
@@ -605,17 +1018,19 @@
     </div>
 
     <div class="input-bar">
-      <button class="btn-icon" id="micBtn" title="Appuie pour parler" onclick="toggleMic()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+      <button class="btn-action" id="micBtn" title="Appuie pour parler" onclick="toggleMic()">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7">
           <rect x="9" y="2" width="6" height="12" rx="3"/>
           <path d="M5 10c0 3.866 3.134 7 7 7s7-3.134 7-7"/>
           <line x1="12" y1="17" x2="12" y2="21"/>
           <line x1="9" y1="21" x2="15" y2="21"/>
         </svg>
       </button>
-      <input type="text" id="textInput" placeholder="Parle à Jarvis..." autocomplete="off" />
-      <button class="btn-icon" id="sendBtn" title="Envoyer" onclick="sendMessage()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+      <div class="input-wrap">
+        <input type="text" id="textInput" placeholder="Parle à Jarvis…" autocomplete="off"/>
+      </div>
+      <button class="btn-action" id="sendBtn" title="Envoyer" onclick="sendMessage()">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7">
           <line x1="22" y1="2" x2="11" y2="13"/>
           <polygon points="22 2 15 22 11 13 2 9 22 2"/>
         </svg>
@@ -626,361 +1041,326 @@
 
 <!-- Config Panel -->
 <div class="config-panel" id="configPanel">
-  <div style="font-family:'Orbitron',monospace;font-size:11px;letter-spacing:3px;color:var(--cyan);text-transform:uppercase;border-bottom:1px solid var(--border);padding-bottom:10px;">Paramètres</div>
-  <div class="config-label">URL Serveur</div>
+  <div class="cfg-title">Paramètres système</div>
+
+  <div class="cfg-label">URL Serveur</div>
   <input type="text" id="cfgUrl" value="ws://localhost:8765" placeholder="ws://IP:8765"/>
-  <div class="config-label">Token secret</div>
-  <input type="password" id="cfgToken" value="" placeholder="ton token serveur"/>
-  <div class="config-label">Device ID</div>
+
+  <div class="cfg-label">Token secret</div>
+  <input type="password" id="cfgToken" value="" placeholder="token serveur"/>
+
+  <div class="cfg-label">Device ID</div>
   <input type="text" id="cfgDevice" value="browser" placeholder="browser"/>
-  <button class="btn-connect" onclick="connect()">Connecter</button>
-  <button class="btn-connect" style="margin-top:6px;border-color:rgba(255,68,102,0.4);color:var(--red);background:rgba(255,68,102,0.06);" onclick="disconnect()">Déconnecter</button>
+
+  <div class="cfg-btns">
+    <button class="btn-cfg-action" onclick="connect()">Connecter</button>
+    <button class="btn-cfg-action danger" onclick="disconnect()">Déconnecter</button>
+  </div>
 </div>
 
 <script>
-// ═══════════════════════════════════════════════
-// SPHERE 3D — Canvas particle network
-// ═══════════════════════════════════════════════
+/* ═══════════════════════════════════════════════
+   HORLOGE
+════════════════════════════════════════════════ */
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2,'0');
+  const m = String(now.getMinutes()).padStart(2,'0');
+  const s = String(now.getSeconds()).padStart(2,'0');
+  document.getElementById('liveClock').textContent = `${h}:${m}:${s}`;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+/* ═══════════════════════════════════════════════
+   HUD READOUTS — simulation
+════════════════════════════════════════════════ */
+function randomFlicker(base, range) {
+  return (base + (Math.random() - 0.5) * range).toFixed(1);
+}
+setInterval(() => {
+  document.getElementById('hudLoad').textContent = Math.round(65 + Math.random()*20) + '%';
+  document.getElementById('hudTemp').textContent = randomFlicker(38,4) + '°C';
+  document.getElementById('hudLat').textContent  = Math.round(8 + Math.random()*20) + 'ms';
+  document.getElementById('hudPkt').textContent  = randomFlicker(99.5,0.8) + '%';
+  document.getElementById('hudRot').textContent  = (rotY % (Math.PI*2)).toFixed(2);
+}, 1200);
+
+/* ═══════════════════════════════════════════════
+   SPHERE 3D — Canvas particle network
+════════════════════════════════════════════════ */
 const canvas = document.getElementById('sphereCanvas');
 const ctx = canvas.getContext('2d');
 const W = 380, H = 380;
 canvas.width = W; canvas.height = H;
-
-const CX = W / 2, CY = H / 2;
-const RADIUS = 140;
+const CX = W/2, CY = H/2;
+const RADIUS = 138;
 const N_PARTICLES = 120;
 const CONNECT_DIST = 55;
-
-let sphereState = 'idle'; // idle | listening | processing | speaking
+let sphereState = 'idle';
 let frame = 0;
 let rotX = 0, rotY = 0;
 
-// ────────────────────────────────────────────────
-// SHAPES — chaque shape produit N_PARTICLES points cibles {x,y,z}
-// Les particules courantes glissent vers les cibles (lerp) à chaque frame.
-// ────────────────────────────────────────────────
-
-// Sphère via spirale de Fibonacci (répartition uniforme)
 function shapeSphere(n, r) {
   const pts = [];
   const golden = Math.PI * (3 - Math.sqrt(5));
   for (let i = 0; i < n; i++) {
-    const y = 1 - (i / (n - 1)) * 2;
-    const rad = Math.sqrt(1 - y * y);
-    const theta = golden * i;
-    pts.push({ x: Math.cos(theta) * rad * r, y: y * r, z: Math.sin(theta) * rad * r });
+    const y = 1 - (i/(n-1))*2;
+    const rad = Math.sqrt(1-y*y);
+    const theta = golden*i;
+    pts.push({ x: Math.cos(theta)*rad*r, y: y*r, z: Math.sin(theta)*rad*r });
   }
   return pts;
 }
 
-// Étoile 5 branches en 3D (légère épaisseur en z pour garder la profondeur)
 function shapeStar(n, r) {
   const pts = [];
-  const arms = 5;
-  const innerR = r * 0.4;
-  // Génère le polygone d'étoile (10 sommets), puis échantillonne uniformément le long du périmètre
+  const arms = 5, innerR = r*0.4;
   const verts = [];
-  for (let i = 0; i < arms * 2; i++) {
-    const angle = (i * Math.PI) / arms - Math.PI / 2;
-    const radius = i % 2 === 0 ? r : innerR;
-    verts.push({ x: Math.cos(angle) * radius, y: Math.sin(angle) * radius });
+  for (let i = 0; i < arms*2; i++) {
+    const angle = (i*Math.PI)/arms - Math.PI/2;
+    const radius = i%2===0 ? r : innerR;
+    verts.push({ x: Math.cos(angle)*radius, y: Math.sin(angle)*radius });
   }
-  // Périmètre total
-  const segs = [];
-  let total = 0;
+  const segs = []; let total = 0;
   for (let i = 0; i < verts.length; i++) {
-    const a = verts[i], b = verts[(i + 1) % verts.length];
-    const len = Math.hypot(b.x - a.x, b.y - a.y);
-    segs.push({ a, b, len });
-    total += len;
+    const a = verts[i], b = verts[(i+1)%verts.length];
+    const len = Math.hypot(b.x-a.x, b.y-a.y);
+    segs.push({a,b,len}); total += len;
   }
-  // Échantillonnage uniforme
-  const step = total / n;
-  let acc = 0, segIdx = 0, segOffset = 0;
+  let acc = 0, segIdx = 0;
   for (let i = 0; i < n; i++) {
-    const target = i * step;
-    while (segIdx < segs.length - 1 && acc + segs[segIdx].len < target) {
-      acc += segs[segIdx].len;
-      segIdx++;
-    }
-    const t = (target - acc) / segs[segIdx].len;
-    const { a, b } = segs[segIdx];
-    const z = (Math.random() - 0.5) * r * 0.15; // léger volume
-    pts.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z });
+    const target = i*(total/n);
+    while (segIdx < segs.length-1 && acc+segs[segIdx].len < target) { acc+=segs[segIdx].len; segIdx++; }
+    const t = (target-acc)/segs[segIdx].len;
+    const {a,b} = segs[segIdx];
+    pts.push({ x: a.x+(b.x-a.x)*t, y: a.y+(b.y-a.y)*t, z: (Math.random()-0.5)*r*0.15 });
   }
   return pts;
 }
 
-// Texte → points : on rend le texte sur un canvas off-screen, puis on échantillonne les pixels opaques
 function shapeText(text, n, w, h) {
   const off = document.createElement('canvas');
   off.width = w; off.height = h;
   const octx = off.getContext('2d');
   octx.fillStyle = '#fff';
-  octx.textAlign = 'center';
-  octx.textBaseline = 'middle';
-  // Calcule la taille de police pour faire tenir le texte
-  let fontSize = h * 0.65;
+  octx.textAlign = 'center'; octx.textBaseline = 'middle';
+  let fontSize = h*0.65;
   octx.font = `900 ${fontSize}px Orbitron, monospace`;
-  while (octx.measureText(text).width > w * 0.95 && fontSize > 8) {
-    fontSize -= 2;
-    octx.font = `900 ${fontSize}px Orbitron, monospace`;
-  }
-  octx.fillText(text, w / 2, h / 2);
-
-  // Liste des pixels opaques
-  const data = octx.getImageData(0, 0, w, h).data;
+  while (octx.measureText(text).width > w*0.95 && fontSize > 8) { fontSize-=2; octx.font=`900 ${fontSize}px Orbitron, monospace`; }
+  octx.fillText(text, w/2, h/2);
+  const data = octx.getImageData(0,0,w,h).data;
   const opaque = [];
-  for (let py = 0; py < h; py += 2) {
-    for (let px = 0; px < w; px += 2) {
-      if (data[(py * w + px) * 4 + 3] > 128) opaque.push({ x: px - w / 2, y: py - h / 2 });
-    }
-  }
-  if (opaque.length === 0) return shapeSphere(n, Math.min(w, h) / 3);
-
-  // Échantillonnage : si moins de pixels que de particules, on tire avec répétition
+  for (let py = 0; py < h; py+=2) for (let px = 0; px < w; px+=2) if (data[(py*w+px)*4+3]>128) opaque.push({x:px-w/2,y:py-h/2});
+  if (!opaque.length) return shapeSphere(n, Math.min(w,h)/3);
   const pts = [];
-  for (let i = 0; i < n; i++) {
-    const p = opaque[Math.floor(Math.random() * opaque.length)];
-    pts.push({ x: p.x, y: p.y, z: (Math.random() - 0.5) * 8 });
-  }
+  for (let i = 0; i < n; i++) { const p=opaque[Math.floor(Math.random()*opaque.length)]; pts.push({x:p.x,y:p.y,z:(Math.random()-0.5)*8}); }
   return pts;
 }
 
-// Cube filaire 3D : 12 arêtes échantillonnées
 function shapeCube(n, r) {
-  const s = r * 0.78;
-  const corners = [
-    [-s,-s,-s], [s,-s,-s], [s, s,-s], [-s, s,-s],
-    [-s,-s, s], [s,-s, s], [s, s, s], [-s, s, s],
-  ];
-  const edges = [
-    [0,1],[1,2],[2,3],[3,0],
-    [4,5],[5,6],[6,7],[7,4],
-    [0,4],[1,5],[2,6],[3,7],
-  ];
-  const pts = [];
-  const perEdge = Math.max(2, Math.floor(n / edges.length));
-  for (const [a, b] of edges) {
-    const ca = corners[a], cb = corners[b];
-    for (let i = 0; i < perEdge; i++) {
-      const t = i / (perEdge - 1);
-      pts.push({
-        x: ca[0] + (cb[0] - ca[0]) * t,
-        y: ca[1] + (cb[1] - ca[1]) * t,
-        z: ca[2] + (cb[2] - ca[2]) * t,
-      });
-    }
+  const s = r*0.78;
+  const corners = [[-s,-s,-s],[s,-s,-s],[s,s,-s],[-s,s,-s],[-s,-s,s],[s,-s,s],[s,s,s],[-s,s,s]];
+  const edges = [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+  const pts = []; const perEdge = Math.max(2, Math.floor(n/edges.length));
+  for (const [a,b] of edges) {
+    const ca=corners[a], cb=corners[b];
+    for (let i = 0; i < perEdge; i++) { const t=i/(perEdge-1); pts.push({x:ca[0]+(cb[0]-ca[0])*t,y:ca[1]+(cb[1]-ca[1])*t,z:ca[2]+(cb[2]-ca[2])*t}); }
   }
-  while (pts.length < n) pts.push({ ...pts[pts.length % edges.length] });
+  while (pts.length < n) pts.push({...pts[pts.length%edges.length]});
   return pts.slice(0, n);
 }
 
-// Arc Reactor (le réacteur de Stark) : anneau extérieur + branches radiales + anneau central
 function shapeArcReactor(n, r) {
-  const pts = [];
-  const branches = 6;
-  const ringOuter = Math.floor(n * 0.50);
-  for (let i = 0; i < ringOuter; i++) {
-    const a = (i / ringOuter) * Math.PI * 2;
-    pts.push({ x: Math.cos(a) * r, y: Math.sin(a) * r, z: 0 });
-  }
-  const branchTotal = Math.floor(n * 0.30);
-  const perBranch = Math.floor(branchTotal / branches);
+  const pts = []; const branches = 6;
+  const ringOuter = Math.floor(n*0.50);
+  for (let i = 0; i < ringOuter; i++) { const a=(i/ringOuter)*Math.PI*2; pts.push({x:Math.cos(a)*r,y:Math.sin(a)*r,z:0}); }
+  const branchTotal = Math.floor(n*0.30), perBranch = Math.floor(branchTotal/branches);
   for (let b = 0; b < branches; b++) {
-    const a = (b / branches) * Math.PI * 2;
-    for (let i = 0; i < perBranch; i++) {
-      const t = 0.4 + (i / Math.max(1, perBranch - 1)) * 0.55;
-      pts.push({ x: Math.cos(a) * r * t, y: Math.sin(a) * r * t, z: 0 });
-    }
+    const a=(b/branches)*Math.PI*2;
+    for (let i = 0; i < perBranch; i++) { const t=0.4+(i/Math.max(1,perBranch-1))*0.55; pts.push({x:Math.cos(a)*r*t,y:Math.sin(a)*r*t,z:0}); }
   }
-  const remaining = n - pts.length;
-  for (let i = 0; i < remaining; i++) {
-    const a = (i / remaining) * Math.PI * 2;
-    pts.push({ x: Math.cos(a) * r * 0.4, y: Math.sin(a) * r * 0.4, z: 0 });
-  }
+  const remaining = n-pts.length;
+  for (let i = 0; i < remaining; i++) { const a=(i/remaining)*Math.PI*2; pts.push({x:Math.cos(a)*r*0.4,y:Math.sin(a)*r*0.4,z:0}); }
   return pts.slice(0, n);
 }
 
-// Atome : noyau central + 3 orbites elliptiques sur 3 plans perpendiculaires
 function shapeAtom(n, r) {
-  const pts = [];
-  // Noyau (15%)
-  const nucleusN = Math.floor(n * 0.15);
-  const nR = r * 0.18;
-  const golden = Math.PI * (3 - Math.sqrt(5));
-  for (let i = 0; i < nucleusN; i++) {
-    const y = 1 - (i / Math.max(1, nucleusN - 1)) * 2;
-    const rad = Math.sqrt(1 - y * y);
-    const theta = golden * i;
-    pts.push({ x: Math.cos(theta) * rad * nR, y: y * nR, z: Math.sin(theta) * rad * nR });
-  }
-  // 3 orbites
-  const orbR = r * 0.98;
-  const remaining = n - pts.length;
-  const perOrbit = Math.floor(remaining / 3);
-  for (let i = 0; i < perOrbit; i++) {
-    const a = (i / perOrbit) * Math.PI * 2;
-    pts.push({ x: Math.cos(a) * orbR, y: Math.sin(a) * orbR, z: 0 });          // XY
-  }
-  for (let i = 0; i < perOrbit; i++) {
-    const a = (i / perOrbit) * Math.PI * 2;
-    pts.push({ x: Math.cos(a) * orbR, y: 0, z: Math.sin(a) * orbR });           // XZ
-  }
-  while (pts.length < n) {
-    const i = pts.length - 2 * perOrbit - nucleusN;
-    const a = (i / perOrbit) * Math.PI * 2;
-    pts.push({ x: 0, y: Math.cos(a) * orbR, z: Math.sin(a) * orbR });           // YZ
-  }
+  const pts = []; const nucleusN = Math.floor(n*0.15), nR = r*0.18;
+  const golden = Math.PI*(3-Math.sqrt(5));
+  for (let i = 0; i < nucleusN; i++) { const y=1-(i/Math.max(1,nucleusN-1))*2, rad=Math.sqrt(1-y*y), theta=golden*i; pts.push({x:Math.cos(theta)*rad*nR,y:y*nR,z:Math.sin(theta)*rad*nR}); }
+  const orbR = r*0.98, remaining = n-pts.length, perOrbit = Math.floor(remaining/3);
+  for (let i = 0; i < perOrbit; i++) { const a=(i/perOrbit)*Math.PI*2; pts.push({x:Math.cos(a)*orbR,y:Math.sin(a)*orbR,z:0}); }
+  for (let i = 0; i < perOrbit; i++) { const a=(i/perOrbit)*Math.PI*2; pts.push({x:Math.cos(a)*orbR,y:0,z:Math.sin(a)*orbR}); }
+  while (pts.length < n) { const i=pts.length-2*perOrbit-nucleusN, a=(i/perOrbit)*Math.PI*2; pts.push({x:0,y:Math.cos(a)*orbR,z:Math.sin(a)*orbR}); }
   return pts.slice(0, n);
 }
 
-// Cycle des formes — texte alterné DOMINIQUE / JARVIS à chaque tour complet
-const SHAPES = ['sphere', 'star', 'cube', 'arcreactor', 'atom', 'text'];
+const SHAPES = ['sphere','star','cube','arcreactor','atom','hub','tore','face','letterD','dominique'];
 const SHAPE_LABELS = {
-  sphere: 'SPHÈRE', star: 'ÉTOILE', cube: 'CUBE',
-  arcreactor: 'ARC REACTOR', atom: 'ATOME', text: 'TEXTE',
+  sphere:'SPHÈRE', star:'ÉTOILE', cube:'CUBE', arcreactor:'ARC REACTOR',
+  atom:'ATOME', hub:'HUB NEURONAL', tore:'TORE', face:'VISAGE IA',
+  letterD:'LETTRE D', dominique:'DOMINIQUE'
 };
-const TEXTS = ['DOMINIQUE', 'JARVIS'];
-let shapeIdx = 0;
-let textCycle = 0;
-let particles = shapeSphere(N_PARTICLES, RADIUS).map(p => ({ ...p, tx: p.x, ty: p.y, tz: p.z }));
+const TEXTS = ['DOMINIQUE','JARVIS'];
+let shapeIdx = 0, textCycle = 0;
+let faceEyePositions = null;
+
+function shapeHub(n, r) {
+  const pts = [];
+  const outerN=40, innerN=20, spokes=5, spokeN=6;
+  for (let i=0;i<outerN;i++){const a=i/outerN*Math.PI*2;pts.push({x:Math.cos(a)*r,y:Math.sin(a)*r,z:0});}
+  for (let i=0;i<innerN;i++){const a=i/innerN*Math.PI*2;pts.push({x:Math.cos(a)*r*0.45,y:Math.sin(a)*r*0.45,z:0});}
+  for (let s=0;s<spokes;s++){const a=s/spokes*Math.PI*2;for(let i=1;i<=spokeN;i++){const t=i/(spokeN+1),rad=r*0.45+(r-r*0.45)*t;pts.push({x:Math.cos(a)*rad,y:Math.sin(a)*rad,z:0});}}
+  while(pts.length<n) pts.push({...pts[pts.length%outerN]});
+  return pts.slice(0,n);
+}
+
+function shapeTore(n, r) {
+  const pts=[], R=r*0.65, rad=r*0.32, U=18, V=Math.ceil(n/U);
+  for(let i=0;i<U;i++){const u=i/U*Math.PI*2;for(let j=0;j<V&&pts.length<n;j++){const v=j/V*Math.PI*2;pts.push({x:(R+rad*Math.cos(v))*Math.cos(u),y:(R+rad*Math.cos(v))*Math.sin(u),z:rad*Math.sin(v)});}}
+  while(pts.length<n) pts.push({...pts[0]});
+  return pts.slice(0,n);
+}
+
+function shapeFace(n, r) {
+  const pts = [];
+  const golden = Math.PI*(3-Math.sqrt(5));
+  const headN = Math.floor(n*0.76);
+  for(let i=0;i<headN;i++){
+    // y: -1=crown(top) to +1=chin(bottom) in screen space
+    const yRaw = -1 + (i/(headN-1))*2;
+    const yNorm = (yRaw+1)/2; // 0=crown,1=chin
+    let wScale;
+    if(yNorm<0.12)      wScale=0.28+yNorm*4.2;    // crown narrows
+    else if(yNorm<0.32) wScale=0.88;               // forehead
+    else if(yNorm<0.55) wScale=1.0;                // temples/cheeks
+    else if(yNorm<0.78) wScale=0.48+yNorm*0.8;    // jaw
+    else                wScale=0.28+(1-yNorm)*1.5; // chin
+    const rad=Math.sqrt(Math.max(0,1-yRaw*yRaw))*wScale;
+    const theta=golden*i;
+    pts.push({x:Math.cos(theta)*rad*r*0.74,y:yRaw*r*0.96,z:Math.sin(theta)*rad*r*0.25});
+  }
+  // Eyes
+  const eyeY=-r*0.08, eyeX=r*0.28, eyeZ=r*0.26, eyeN=Math.floor(n*0.08);
+  faceEyePositions={lx:-eyeX,ly:eyeY,lz:eyeZ,rx:eyeX,ry:eyeY,rz:eyeZ};
+  for(let i=0;i<eyeN/2;i++){const a=i/(eyeN/2)*Math.PI*2,er=r*0.055;pts.push({x:-eyeX+Math.cos(a)*er*0.5,y:eyeY+Math.sin(a)*er*0.3,z:eyeZ});}
+  for(let i=0;i<eyeN/2;i++){const a=i/(eyeN/2)*Math.PI*2,er=r*0.055;pts.push({x:eyeX+Math.cos(a)*er*0.5,y:eyeY+Math.sin(a)*er*0.3,z:eyeZ});}
+  // Nose bridge
+  const noseN=Math.floor(n*0.04);
+  for(let i=0;i<noseN;i++){const t=i/noseN;pts.push({x:(Math.random()-0.5)*r*0.08,y:r*0.05+t*r*0.16,z:r*0.26+t*r*0.04});}
+  // Mouth arc
+  const mouthN=Math.floor(n*0.05);
+  for(let i=0;i<mouthN;i++){const t=i/mouthN,a=Math.PI*0.22+t*Math.PI*0.56;pts.push({x:Math.cos(a)*r*0.22,y:r*0.28+Math.sin(a)*r*0.05,z:r*0.2});}
+  while(pts.length<n) pts.push({...pts[Math.floor(Math.random()*headN)]});
+  return pts.slice(0,n);
+}
+
+function shapeLetterD(n, r) {
+  return shapeText('D', n, 300, 300);
+}
+
+function shapeDominique(n, r) {
+  return shapeText('DOMINIQUE', n, 340, 120);
+}
+
+let particles = shapeSphere(N_PARTICLES, RADIUS).map(p => ({...p,tx:p.x,ty:p.y,tz:p.z}));
 
 function setShape(name) {
-  let target, label = SHAPE_LABELS[name] || name.toUpperCase();
-  if (name === 'sphere')          target = shapeSphere(N_PARTICLES, RADIUS);
-  else if (name === 'star')       target = shapeStar(N_PARTICLES, RADIUS * 1.05);
-  else if (name === 'cube')       target = shapeCube(N_PARTICLES, RADIUS);
-  else if (name === 'arcreactor') target = shapeArcReactor(N_PARTICLES, RADIUS * 1.0);
-  else if (name === 'atom')       target = shapeAtom(N_PARTICLES, RADIUS);
-  else if (name === 'text') {
-    const word = TEXTS[textCycle % TEXTS.length];
-    target = shapeText(word, N_PARTICLES, 340, 140);
-    label = word;
-    textCycle++;
-  } else target = shapeSphere(N_PARTICLES, RADIUS);
-
-  // Mappe chaque particule à la cible la plus proche (limite les croisements)
+  let target, label = SHAPE_LABELS[name]||name.toUpperCase();
+  if (name==='sphere')          target = shapeSphere(N_PARTICLES, RADIUS);
+  else if (name==='star')       target = shapeStar(N_PARTICLES, RADIUS*1.05);
+  else if (name==='cube')       target = shapeCube(N_PARTICLES, RADIUS);
+  else if (name==='arcreactor') target = shapeArcReactor(N_PARTICLES, RADIUS);
+  else if (name==='atom')       target = shapeAtom(N_PARTICLES, RADIUS);
+  else if (name==='hub')        target = shapeHub(N_PARTICLES, RADIUS);
+  else if (name==='tore')       target = shapeTore(N_PARTICLES, RADIUS);
+  else if (name==='face')       target = shapeFace(N_PARTICLES, RADIUS);
+  else if (name==='letterD')    target = shapeLetterD(N_PARTICLES, RADIUS);
+  else if (name==='dominique')  target = shapeDominique(N_PARTICLES, RADIUS);
+  else target = shapeSphere(N_PARTICLES, RADIUS);
   const used = new Array(target.length).fill(false);
   for (let i = 0; i < particles.length; i++) {
-    let bestJ = -1, bestD = Infinity;
-    for (let j = 0; j < target.length; j++) {
-      if (used[j]) continue;
-      const dx = particles[i].x - target[j].x, dy = particles[i].y - target[j].y, dz = particles[i].z - target[j].z;
-      const d = dx*dx + dy*dy + dz*dz;
-      if (d < bestD) { bestD = d; bestJ = j; }
-    }
-    if (bestJ >= 0) {
-      used[bestJ] = true;
-      particles[i].tx = target[bestJ].x;
-      particles[i].ty = target[bestJ].y;
-      particles[i].tz = target[bestJ].z;
-    }
+    let bestJ=-1, bestD=Infinity;
+    for (let j = 0; j < target.length; j++) { if (used[j]) continue; const dx=particles[i].x-target[j].x,dy=particles[i].y-target[j].y,dz=particles[i].z-target[j].z,d=dx*dx+dy*dy+dz*dz; if (d<bestD){bestD=d;bestJ=j;} }
+    if (bestJ>=0) { used[bestJ]=true; particles[i].tx=target[bestJ].x; particles[i].ty=target[bestJ].y; particles[i].tz=target[bestJ].z; }
   }
   document.getElementById('shapeIndicator').textContent = label;
 }
 
-// Cycle automatique
-setInterval(() => {
-  shapeIdx = (shapeIdx + 1) % SHAPES.length;
-  setShape(SHAPES[shapeIdx]);
-}, 7000);
+setInterval(() => { shapeIdx=(shapeIdx+1)%SHAPES.length; setShape(SHAPES[shapeIdx]); }, 7000);
 
 function rotate(pts, rx, ry) {
-  const cosX = Math.cos(rx), sinX = Math.sin(rx);
-  const cosY = Math.cos(ry), sinY = Math.sin(ry);
+  const cosX=Math.cos(rx),sinX=Math.sin(rx),cosY=Math.cos(ry),sinY=Math.sin(ry);
   return pts.map(p => {
-    let x = p.x, y = p.y, z = p.z;
-    // Rotation Y
-    let nx = x * cosY + z * sinY, nz = -x * sinY + z * cosY;
-    x = nx; z = nz;
-    // Rotation X
-    let ny = y * cosX - z * sinX, nz2 = y * sinX + z * cosX;
-    return { ...p, rx: x, ry: ny, rz: nz2 };
+    let x=p.x,y=p.y,z=p.z;
+    let nx=x*cosY+z*sinY,nz=-x*sinY+z*cosY; x=nx; z=nz;
+    let ny=y*cosX-z*sinX,nz2=y*sinX+z*cosX;
+    return {...p,rx:x,ry:ny,rz:nz2};
   });
 }
 
 function project(pt) {
-  const fov = 500;
-  const scale = fov / (fov + pt.rz);
-  return { sx: CX + pt.rx * scale, sy: CY + pt.ry * scale, scale };
+  const fov=500, scale=fov/(fov+pt.rz);
+  return { sx:CX+pt.rx*scale, sy:CY+pt.ry*scale, scale };
 }
 
 function getStateColors() {
   switch(sphereState) {
-    case 'listening': return { core: '#ff4466', node: 'rgba(255,68,102,', conn: 'rgba(255,68,102,', glow: '#ff4466' };
-    case 'processing': return { core: '#ffd700', node: 'rgba(255,215,0,', conn: 'rgba(255,215,0,', glow: '#ffd700' };
-    case 'speaking': return { core: '#00ff88', node: 'rgba(0,255,136,', conn: 'rgba(0,255,136,', glow: '#00ff88' };
-    default: return { core: '#00d4ff', node: 'rgba(0,212,255,', conn: 'rgba(0,212,255,', glow: '#00d4ff' };
+    case 'listening':  return { core:'#ff3b5c', node:'rgba(255,59,92,',  conn:'rgba(255,59,92,' };
+    case 'processing': return { core:'#f5c518', node:'rgba(245,197,24,', conn:'rgba(245,197,24,' };
+    case 'speaking':   return { core:'#00ffa3', node:'rgba(0,255,163,',  conn:'rgba(0,255,163,' };
+    default:           return { core:'#00e5ff', node:'rgba(0,229,255,',  conn:'rgba(0,229,255,' };
   }
 }
 
 function drawSphere() {
-  ctx.clearRect(0, 0, W, H);
-
-  const t = frame / 60;
+  ctx.clearRect(0,0,W,H);
+  const t = frame/60;
   const c = getStateColors();
 
   // Glow central
-  const glowIntensity = sphereState === 'idle' ? 0.5 + Math.sin(t * 1.5) * 0.15 : 0.8 + Math.sin(t * 4) * 0.2;
-  const glowSize = sphereState === 'processing' ? 60 + Math.sin(t * 6) * 15 : 50;
-  const grad = ctx.createRadialGradient(CX, CY, 0, CX, CY, glowSize);
-  grad.addColorStop(0, c.core + '33');
-  grad.addColorStop(0.5, c.core + '11');
-  grad.addColorStop(1, 'transparent');
+  const glowSize = sphereState==='processing' ? 60+Math.sin(t*6)*15 : 50;
+  const grad = ctx.createRadialGradient(CX,CY,0,CX,CY,glowSize);
+  grad.addColorStop(0, c.core+'33');
+  grad.addColorStop(0.5, c.core+'0d');
+  grad.addColorStop(1,'transparent');
   ctx.fillStyle = grad;
-  ctx.beginPath(); ctx.arc(CX, CY, glowSize, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(CX,CY,glowSize,0,Math.PI*2); ctx.fill();
 
-  // Rotation 3D : sphère / cube / atome tournent. Texte et arc reactor restent face caméra.
   const currentShape = SHAPES[shapeIdx];
-  const isFlat = currentShape === 'text' || currentShape === 'arcreactor';
-  const speed = isFlat ? 0 : (sphereState === 'processing' ? 0.018 : sphereState === 'listening' ? 0.008 : 0.005);
-  rotY += speed;
-  rotX += speed * 0.4;
-  if (isFlat) { rotX *= 0.92; rotY *= 0.92; } // ramène vers 0 pour stabiliser
+  const isFlat = currentShape==='arcreactor'||currentShape==='hub'||currentShape==='face'||currentShape==='letterD'||currentShape==='dominique';
+  const speed = isFlat ? 0 : (sphereState==='processing' ? 0.018 : sphereState==='listening' ? 0.008 : 0.005);
+  rotY += speed; rotX += speed*0.4;
+  if (isFlat) { rotX*=0.92; rotY*=0.92; }
 
-  // Pulsation des particules selon l'état
-  // - listening : modulé par le volume RÉEL du micro (Web Audio API)
-  // - speaking : simulation par sinus rapide (signal audio non capturable depuis speechSynthesis)
-  // - processing/idle : sinus doux
   let pulse = 1;
-  if (sphereState === 'listening') {
-    const lvl = readAudioLevel();        // 0..1
-    pulse = 1 + lvl * 0.35 + Math.sin(t * 5) * 0.02;
-  } else if (sphereState === 'speaking') {
-    // Simulation : 2 sinus de fréquences différentes pour un effet "syllabique"
-    pulse = 1 + Math.abs(Math.sin(t * 9)) * 0.18 + Math.sin(t * 14) * 0.04;
-  } else if (sphereState === 'processing') {
-    pulse = 1 + Math.sin(t * 4) * 0.05;
-  }
+  if (sphereState==='listening') { const lvl=readAudioLevel(); pulse=1+lvl*0.35+Math.sin(t*5)*0.02; }
+  else if (sphereState==='speaking') { pulse=1+Math.abs(Math.sin(t*9))*0.18+Math.sin(t*14)*0.04; }
+  else if (sphereState==='processing') { pulse=1+Math.sin(t*4)*0.05; }
 
-  // Interpolation des particules vers leur cible (morphing)
   const lerp = 0.06;
-  for (const p of particles) {
-    p.x += (p.tx - p.x) * lerp;
-    p.y += (p.ty - p.y) * lerp;
-    p.z += (p.tz - p.z) * lerp;
-  }
+  for (const p of particles) { p.x+=(p.tx-p.x)*lerp; p.y+=(p.ty-p.y)*lerp; p.z+=(p.tz-p.z)*lerp; }
 
-  const projected = rotate(particles.map(p => ({...p, x: p.x*pulse, y: p.y*pulse, z: p.z*pulse})), rotX, rotY)
-    .map(p => ({ ...p, proj: project(p) }))
-    .sort((a, b) => a.rz - b.rz);
+  const projected = rotate(particles.map(p=>({...p,x:p.x*pulse,y:p.y*pulse,z:p.z*pulse})),rotX,rotY)
+    .map(p=>({...p,proj:project(p)}))
+    .sort((a,b)=>a.rz-b.rz);
 
-  // Connexions entre particules proches
+  // Connexions
   for (let i = 0; i < projected.length; i++) {
-    const a = projected[i];
-    for (let j = i + 1; j < projected.length; j++) {
-      const b = projected[j];
-      const dx = a.rx - b.rx, dy = a.ry - b.ry, dz = a.rz - b.rz;
-      const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+    const a=projected[i];
+    for (let j = i+1; j < projected.length; j++) {
+      const b=projected[j];
+      const dx=a.rx-b.rx,dy=a.ry-b.ry,dz=a.rz-b.rz;
+      const dist=Math.sqrt(dx*dx+dy*dy+dz*dz);
       if (dist < CONNECT_DIST) {
-        const alpha = (1 - dist / CONNECT_DIST) * 0.35;
-        const depthAlpha = ((a.proj.scale + b.proj.scale) / 2) * alpha;
+        const alpha=(1-dist/CONNECT_DIST)*0.3;
+        const depthAlpha=((a.proj.scale+b.proj.scale)/2)*alpha;
         ctx.beginPath();
-        ctx.strokeStyle = c.conn + depthAlpha + ')';
-        ctx.lineWidth = 0.6;
-        ctx.moveTo(a.proj.sx, a.proj.sy);
-        ctx.lineTo(b.proj.sx, b.proj.sy);
+        ctx.strokeStyle=c.conn+depthAlpha+')';
+        ctx.lineWidth=0.5;
+        ctx.moveTo(a.proj.sx,a.proj.sy);
+        ctx.lineTo(b.proj.sx,b.proj.sy);
         ctx.stroke();
       }
     }
@@ -988,274 +1368,229 @@ function drawSphere() {
 
   // Nœuds
   for (const p of projected) {
-    const { sx, sy, scale } = p.proj;
-    const r = Math.max(1.2, scale * 2.5);
-    const alpha = 0.4 + scale * 0.6;
-
-    ctx.beginPath();
-    ctx.arc(sx, sy, r, 0, Math.PI * 2);
-    ctx.fillStyle = c.node + alpha + ')';
-    ctx.fill();
-
-    // Halo sur les nœuds avant
-    if (scale > 0.85) {
-      ctx.beginPath();
-      ctx.arc(sx, sy, r * 2.5, 0, Math.PI * 2);
-      ctx.fillStyle = c.node + (alpha * 0.15) + ')';
-      ctx.fill();
+    const {sx,sy,scale}=p.proj;
+    const r=Math.max(1.2,scale*2.5);
+    const alpha=0.4+scale*0.6;
+    ctx.beginPath(); ctx.arc(sx,sy,r,0,Math.PI*2);
+    ctx.fillStyle=c.node+alpha+')'; ctx.fill();
+    if (scale>0.85) {
+      ctx.beginPath(); ctx.arc(sx,sy,r*2.5,0,Math.PI*2);
+      ctx.fillStyle=c.node+(alpha*0.12)+')'; ctx.fill();
     }
   }
 
-  // Étoile centrale (le "noyau")
-  const starIntensity = sphereState === 'idle' ? 0.6 + Math.sin(t * 2) * 0.2 : 1;
-  const starSize = 12 + Math.sin(t * 3) * 3;
-  drawStar(CX, CY, starSize, c.core, starIntensity);
+  // Yeux lumineux — visage IA
+  if (currentShape==='face' && faceEyePositions) {
+    const drawEye = (ex3, ey3, ez3) => {
+      // Project eye position
+      const cosX=Math.cos(rotX),sinX=Math.sin(rotX),cosY=Math.cos(rotY),sinY=Math.sin(rotY);
+      let x=ex3,y=ey3,z=ez3;
+      let nx=x*cosY+z*sinY,nz=-x*sinY+z*cosY; x=nx; z=nz;
+      let ny=y*cosX-z*sinX,nz2=y*sinX+z*cosX;
+      const fov=500, sc=fov/(fov+nz2);
+      const sx=CX+x*sc*2.5, sy=CY+ny*sc*2.5;
+      // Outer soft glow
+      const g1=ctx.createRadialGradient(sx,sy,0,sx,sy,38);
+      g1.addColorStop(0,'rgba(0,180,255,0.35)');
+      g1.addColorStop(0.4,'rgba(0,120,255,0.18)');
+      g1.addColorStop(1,'rgba(0,80,200,0)');
+      ctx.fillStyle=g1; ctx.beginPath(); ctx.arc(sx,sy,38,0,Math.PI*2); ctx.fill();
+      // Mid glow
+      const g2=ctx.createRadialGradient(sx,sy,0,sx,sy,14);
+      g2.addColorStop(0,'rgba(120,220,255,0.95)');
+      g2.addColorStop(0.5,'rgba(40,160,255,0.7)');
+      g2.addColorStop(1,'rgba(0,100,255,0)');
+      ctx.fillStyle=g2; ctx.beginPath(); ctx.arc(sx,sy,14,0,Math.PI*2); ctx.fill();
+      // Bright core
+      ctx.beginPath(); ctx.arc(sx,sy,4,0,Math.PI*2);
+      ctx.fillStyle='rgba(200,240,255,1)'; ctx.fill();
+      // Lens flare cross
+      ctx.save(); ctx.globalAlpha=0.25;
+      for(const [dx,dy] of [[1,0],[0,1]]){
+        ctx.beginPath(); ctx.moveTo(sx-dx*30,sy-dy*30); ctx.lineTo(sx+dx*30,sy+dy*30);
+        ctx.strokeStyle='rgba(100,200,255,0.5)'; ctx.lineWidth=1.5; ctx.stroke();
+      }
+      ctx.restore();
+    };
+    const fp=faceEyePositions;
+    drawEye(fp.lx,fp.ly,fp.lz);
+    drawEye(fp.rx,fp.ry,fp.rz);
+  }
+
+  // Noyau central
+  const starSize = 11+Math.sin(t*3)*2.5;
+  const sAlpha = sphereState==='idle' ? 0.6+Math.sin(t*2)*0.2 : 1;
+  drawStar(CX,CY,starSize,c.core,sAlpha);
+
+  // Update barres d'énergie
+  if (frame%8===0) {
+    const neural = Math.round(60+Math.random()*30);
+    const voice = sphereState==='listening'||sphereState==='speaking' ? Math.round(40+Math.random()*50) : Math.round(Math.random()*10);
+    const net = sphereState==='processing' ? Math.round(60+Math.random()*35) : Math.round(25+Math.random()*20);
+    document.getElementById('efNeural').style.width = neural+'%';
+    document.getElementById('evNeural').textContent = neural+'%';
+    document.getElementById('efVoice').style.width = voice+'%';
+    document.getElementById('evVoice').textContent = voice+'%';
+    document.getElementById('efNet').style.width = net+'%';
+    document.getElementById('evNet').textContent = net+'%';
+    document.getElementById('hudFreq').textContent = (1+Math.random()*0.8).toFixed(1)+'kHz';
+  }
 
   frame++;
   requestAnimationFrame(drawSphere);
 }
 
 function drawStar(x, y, size, color, alpha) {
-  ctx.save();
-  ctx.translate(x, y);
-  const arms = 4;
+  ctx.save(); ctx.translate(x,y);
+  const arms=4;
   ctx.beginPath();
-  for (let i = 0; i < arms * 2; i++) {
-    const angle = (i * Math.PI) / arms;
-    const r = i % 2 === 0 ? size : size * 0.35;
-    const px = Math.cos(angle - Math.PI/2) * r;
-    const py = Math.sin(angle - Math.PI/2) * r;
-    i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+  for (let i = 0; i < arms*2; i++) {
+    const angle=(i*Math.PI)/arms;
+    const r=i%2===0 ? size : size*0.35;
+    const px=Math.cos(angle-Math.PI/2)*r, py=Math.sin(angle-Math.PI/2)*r;
+    i===0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py);
   }
   ctx.closePath();
-  ctx.fillStyle = color + Math.round(alpha * 255).toString(16).padStart(2,'0');
-  ctx.shadowColor = color;
-  ctx.shadowBlur = size * 3;
-  ctx.fill();
+  ctx.fillStyle = color + Math.round(alpha*255).toString(16).padStart(2,'0');
+  ctx.shadowColor = color; ctx.shadowBlur = size*3; ctx.fill();
   ctx.restore();
 }
 
 drawSphere();
 
-// ═══════════════════════════════════════════════
-// PASSWORD GATE — vocal ou écrit, mot de passe : "Press on"
-// ═══════════════════════════════════════════════
+/* ═══════════════════════════════════════════════
+   PASSWORD GATE
+════════════════════════════════════════════════ */
 const PASSWORD = 'press on';
-
 function normalizePwd(s) {
-  return (s || '')
-    .toLowerCase()
-    .normalize('NFD').replace(/[̀-ͯ]/g, '') // retire accents
-    .replace(/[^a-z0-9 ]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
 }
-
 function checkPassword() {
   const input = document.getElementById('pwdInput').value;
-  const hint = document.getElementById('pwdHint');
-  if (normalizePwd(input) === PASSWORD) {
-    hint.textContent = 'Identifié. Bienvenue, Dominique.';
-    hint.className = 'pwd-hint success';
+  const hint  = document.getElementById('pwdHint');
+  if (normalizePwd(input)===PASSWORD) {
+    hint.textContent='Identifié. Bienvenue, Dominique.'; hint.className='pwd-hint success';
     setTimeout(() => {
-      const gate = document.getElementById('passwordGate');
+      const gate=document.getElementById('passwordGate');
       gate.classList.add('hidden');
-      setTimeout(() => gate.style.display = 'none', 700);
+      setTimeout(()=>gate.style.display='none',700);
     }, 600);
   } else {
-    hint.textContent = 'Mot de passe incorrect.';
-    hint.className = 'pwd-hint error';
-    document.getElementById('pwdInput').value = '';
+    hint.textContent='Mot de passe incorrect.'; hint.className='pwd-hint error';
+    document.getElementById('pwdInput').value='';
   }
 }
+document.getElementById('pwdInput').addEventListener('keydown', e => { if (e.key==='Enter'){e.preventDefault();checkPassword();} });
 
-document.getElementById('pwdInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter') { e.preventDefault(); checkPassword(); }
-});
-
-let pwdRecognition = null;
-let pwdListening = false;
-
+let pwdRecognition=null, pwdListening=false;
 function pwdToggleMic() {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) {
-    document.getElementById('pwdHint').textContent = 'Reconnaissance vocale non supportée par ce navigateur.';
-    document.getElementById('pwdHint').className = 'pwd-hint error';
-    return;
-  }
-  if (pwdListening) {
-    pwdRecognition?.stop();
-    return;
-  }
-
-  pwdRecognition = new SR();
-  pwdRecognition.lang = 'fr-FR';
-  pwdRecognition.continuous = false;
-  pwdRecognition.interimResults = false;
-
-  pwdRecognition.onstart = () => {
-    pwdListening = true;
-    document.getElementById('pwdMicBtn').classList.add('listening');
-    document.getElementById('pwdHint').textContent = 'Écoute…';
-    document.getElementById('pwdHint').className = 'pwd-hint';
-  };
-  pwdRecognition.onresult = (e) => {
-    const text = e.results[0][0].transcript;
-    document.getElementById('pwdInput').value = text;
-    checkPassword();
-  };
-  pwdRecognition.onend = () => {
-    pwdListening = false;
-    document.getElementById('pwdMicBtn').classList.remove('listening');
-  };
-  pwdRecognition.onerror = () => {
-    pwdListening = false;
-    document.getElementById('pwdMicBtn').classList.remove('listening');
-  };
-
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if (!SR) { document.getElementById('pwdHint').textContent='Reconnaissance vocale non supportée.'; document.getElementById('pwdHint').className='pwd-hint error'; return; }
+  if (pwdListening) { pwdRecognition?.stop(); return; }
+  pwdRecognition=new SR(); pwdRecognition.lang='fr-FR'; pwdRecognition.continuous=false; pwdRecognition.interimResults=false;
+  pwdRecognition.onstart=()=>{ pwdListening=true; document.getElementById('pwdMicBtn').classList.add('listening'); document.getElementById('pwdHint').textContent='Écoute…'; document.getElementById('pwdHint').className='pwd-hint'; };
+  pwdRecognition.onresult=(e)=>{ document.getElementById('pwdInput').value=e.results[0][0].transcript; checkPassword(); };
+  pwdRecognition.onend=()=>{ pwdListening=false; document.getElementById('pwdMicBtn').classList.remove('listening'); };
+  pwdRecognition.onerror=()=>{ pwdListening=false; document.getElementById('pwdMicBtn').classList.remove('listening'); };
   pwdRecognition.start();
 }
+window.addEventListener('load', ()=>document.getElementById('pwdInput').focus());
 
-// Focus auto sur le champ de mot de passe au chargement
-window.addEventListener('load', () => document.getElementById('pwdInput').focus());
-
-// ═══════════════════════════════════════════════
-// AUTO-CONFIG : si l'UI est servie par le serveur (http://...),
-// on déduit l'URL WebSocket à partir de window.location → plus de saisie manuelle.
-// (L'utilisateur tape juste son token, ou même rien si on le pré-remplit ensuite.)
-// ═══════════════════════════════════════════════
+/* AUTO-CONFIG */
 (function autoConfigServer() {
-  // Si on est en file://, on garde la valeur par défaut (l'utilisateur configurera)
-  if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
-  const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = `${wsProto}//${location.host}`;
-  const urlInput = document.getElementById('cfgUrl');
-  if (urlInput) urlInput.value = wsUrl;
-  // Device id par défaut basé sur le user-agent (mobile = "phone-chrome", desktop = "browser")
-  const ua = navigator.userAgent.toLowerCase();
-  const isMobile = /android|iphone|ipad|mobile/.test(ua);
-  const deviceInput = document.getElementById('cfgDevice');
-  if (deviceInput && deviceInput.value === 'browser') {
-    deviceInput.value = isMobile ? 'phone-browser' : 'browser';
-  }
+  if (location.protocol!=='http:'&&location.protocol!=='https:') return;
+  const wsProto=location.protocol==='https:'?'wss:':'ws:';
+  const urlInput=document.getElementById('cfgUrl');
+  if (urlInput) urlInput.value=`${wsProto}//${location.host}`;
+  const ua=navigator.userAgent.toLowerCase();
+  const deviceInput=document.getElementById('cfgDevice');
+  if (deviceInput&&deviceInput.value==='browser') deviceInput.value=/android|iphone|ipad|mobile/.test(ua)?'phone-browser':'browser';
 })();
 
-// ═══════════════════════════════════════════════
-// ÉTAT JARVIS
-// ═══════════════════════════════════════════════
-const stateTexts = {
-  idle: 'STANDBY',
-  listening: 'ÉCOUTE',
-  processing: 'TRAITEMENT...',
-  speaking: 'PARLE'
-};
+/* ═══════════════════════════════════════════════
+   ÉTAT
+════════════════════════════════════════════════ */
+const stateTexts = { idle:'STANDBY', listening:'ÉCOUTE', processing:'TRAITEMENT...', speaking:'PARLE' };
+const stateClasses = { idle:'', listening:'state--listening', processing:'state--processing', speaking:'state--speaking' };
 
 function setState(s) {
   sphereState = s;
-  document.getElementById('stateLabel').textContent = stateTexts[s] || s.toUpperCase();
-  document.getElementById('sphereStateText').textContent = stateTexts[s] || s.toUpperCase();
-  const colors = { idle: 'var(--cyan)', listening: 'var(--red)', processing: 'var(--gold)', speaking: 'var(--green)' };
-  document.getElementById('sphereStateText').style.color = colors[s] || 'var(--cyan)';
-  document.getElementById('sphereStateText').style.textShadow = `0 0 10px ${colors[s] || 'var(--cyan)'}`;
+  document.getElementById('stateLabel').textContent = stateTexts[s]||s.toUpperCase();
+  document.getElementById('sphereStateText').textContent = stateTexts[s]||s.toUpperCase();
+  const layout = document.getElementById('mainLayout');
+  layout.className = 'main ' + (stateClasses[s]||'');
 }
 
-// ═══════════════════════════════════════════════
-// WEBSOCKET
-// ═══════════════════════════════════════════════
-let ws = null;
-let thinkingMsgEl = null;
+/* ═══════════════════════════════════════════════
+   WEBSOCKET
+════════════════════════════════════════════════ */
+let ws=null, thinkingMsgEl=null;
 
 function connect() {
-  const url = document.getElementById('cfgUrl').value.trim();
-  const token = document.getElementById('cfgToken').value.trim();
-  const device = document.getElementById('cfgDevice').value.trim() || 'browser';
-  const fullUrl = `${url}/ws/${device}?token=${token}`;
-
+  const url=document.getElementById('cfgUrl').value.trim();
+  const token=document.getElementById('cfgToken').value.trim();
+  const device=document.getElementById('cfgDevice').value.trim()||'browser';
+  const fullUrl=`${url}/ws/${device}?token=${token}`;
   if (ws) ws.close();
-
-  ws = new WebSocket(fullUrl);
-
-  ws.onopen = () => {
-    document.getElementById('connStatus').className = 'connection-status connected';
-    document.getElementById('connStatus').textContent = 'EN LIGNE';
-    addSystemMsg('Connexion établie. Jarvis est prêt.');
-    toggleConfig();
+  ws=new WebSocket(fullUrl);
+  ws.onopen=()=>{ setConn(true); addSystemMsg('Connexion établie. Jarvis est prêt.'); toggleConfig(); };
+  ws.onmessage=(evt)=>{
+    const data=JSON.parse(evt.data);
+    if (data.type==='tool_action') addToolAction(data.tool,data.result?.success!==false);
+    else if (data.type==='response') { removeThinking(); setState('speaking'); addJarvisMsg(data.content); speak(data.content); setTimeout(()=>setState('idle'),200); }
+    else if (data.type==='connected') addSystemMsg(data.message||'Connecté');
+    else if (data.type==='error') { removeThinking(); setState('idle'); addSystemMsg('Erreur : '+(data.content||'inconnue'),true); }
+    else if (data.type==='info') addSystemMsg(data.message||'');
   };
-
-  ws.onmessage = (evt) => {
-    const data = JSON.parse(evt.data);
-    if (data.type === 'tool_action') {
-      addToolAction(data.tool, data.result?.success !== false);
-    } else if (data.type === 'response') {
-      removeThinking();
-      setState('speaking');
-      addJarvisMsg(data.content);
-      speak(data.content);
-      setTimeout(() => setState('idle'), 200);
-    } else if (data.type === 'connected') {
-      addSystemMsg(data.message || 'Connecté');
-    } else if (data.type === 'error') {
-      removeThinking();
-      setState('idle');
-      addSystemMsg('Erreur serveur : ' + (data.content || 'inconnue'), true);
-    } else if (data.type === 'info') {
-      addSystemMsg(data.message || '');
-    }
-  };
-
-  ws.onclose = () => {
-    document.getElementById('connStatus').className = 'connection-status disconnected';
-    document.getElementById('connStatus').textContent = 'HORS LIGNE';
-    setState('idle');
-  };
-
-  ws.onerror = () => {
-    addSystemMsg('Erreur de connexion. Vérifie que le serveur Jarvis tourne.', true);
-    setState('idle');
-  };
+  ws.onclose=()=>{ setConn(false); setState('idle'); };
+  ws.onerror=()=>{ addSystemMsg('Erreur de connexion. Serveur actif ?',true); setState('idle'); };
 }
 
-function disconnect() {
-  if (ws) { ws.close(); ws = null; }
+function disconnect() { if (ws){ws.close();ws=null;} }
+
+function setConn(on) {
+  const pill=document.getElementById('connStatus');
+  const txt=document.getElementById('connText');
+  pill.className='status-pill'+(on?' connected':'');
+  txt.textContent = on ? 'EN LIGNE' : 'HORS LIGNE';
 }
 
-// ═══════════════════════════════════════════════
-// MESSAGES
-// ═══════════════════════════════════════════════
+/* ═══════════════════════════════════════════════
+   MESSAGES
+════════════════════════════════════════════════ */
 function addMsg(role, text) {
-  const chat = document.getElementById('chat');
-  const isUser = role === 'user';
-  const div = document.createElement('div');
-  div.className = `msg ${isUser ? 'user' : 'jarvis'}`;
-  div.innerHTML = `
-    <div class="msg-avatar">${isUser ? 'VOUS' : 'J'}</div>
+  const chat=document.getElementById('chat');
+  const isUser=role==='user';
+  const div=document.createElement('div');
+  div.className=`msg ${isUser?'user':'jarvis'}`;
+  div.innerHTML=`
+    <div class="msg-avatar">${isUser?'VOUS':'J'}</div>
     <div class="msg-content">
-      <div class="msg-sender">${isUser ? 'VOUS' : 'JARVIS'}</div>
+      <div class="msg-sender">${isUser?'VOUS':'JARVIS'}</div>
       <div class="msg-text">${text}</div>
     </div>`;
   chat.appendChild(div);
-  chat.scrollTop = chat.scrollHeight;
+  chat.scrollTop=chat.scrollHeight;
   return div;
 }
+function addJarvisMsg(text) { return addMsg('jarvis',text); }
+function addUserMsg(text)   { return addMsg('user',text); }
 
-function addJarvisMsg(text) { return addMsg('jarvis', text); }
-function addUserMsg(text) { return addMsg('user', text); }
-
-function addSystemMsg(text, isError = false) {
-  const chat = document.getElementById('chat');
-  const div = document.createElement('div');
-  div.style.cssText = `text-align:center;font-family:'Orbitron',monospace;font-size:10px;letter-spacing:2px;color:${isError ? 'var(--red)' : 'var(--text-dim)'};padding:8px;text-transform:uppercase;`;
-  div.textContent = `— ${text} —`;
+function addSystemMsg(text, isError=false) {
+  const chat=document.getElementById('chat');
+  const div=document.createElement('div');
+  div.className='sys-msg';
+  div.style.color=isError?'var(--red)':'var(--text-dim)';
+  div.textContent=text;
   chat.appendChild(div);
-  chat.scrollTop = chat.scrollHeight;
+  chat.scrollTop=chat.scrollHeight;
 }
 
 function addThinking() {
-  const chat = document.getElementById('chat');
-  const div = document.createElement('div');
-  div.className = 'msg jarvis';
-  div.id = 'thinkingMsg';
-  div.innerHTML = `
+  const chat=document.getElementById('chat');
+  const div=document.createElement('div');
+  div.className='msg jarvis'; div.id='thinkingMsg';
+  div.innerHTML=`
     <div class="msg-avatar">J</div>
     <div class="msg-content">
       <div class="msg-sender">JARVIS</div>
@@ -1264,274 +1599,150 @@ function addThinking() {
         <span class="thinking-dots"><span></span><span></span><span></span></span>
       </div>
     </div>`;
-  chat.appendChild(div);
-  chat.scrollTop = chat.scrollHeight;
-  thinkingMsgEl = div;
+  chat.appendChild(div); chat.scrollTop=chat.scrollHeight;
+  thinkingMsgEl=div;
 }
-
-function removeThinking() {
-  if (thinkingMsgEl) { thinkingMsgEl.remove(); thinkingMsgEl = null; }
-}
+function removeThinking() { if (thinkingMsgEl){thinkingMsgEl.remove();thinkingMsgEl=null;} }
 
 function addToolAction(toolName, success) {
-  const el = thinkingMsgEl?.querySelector('.thinking');
+  const el=thinkingMsgEl?.querySelector('.thinking');
   if (!el) return;
-  const chip = document.createElement('span');
-  chip.className = `tool-action ${success ? 'ok' : 'err'}`;
-  chip.innerHTML = `<span class="tool-dot"></span>${toolName}`;
+  const chip=document.createElement('span');
+  chip.className=`tool-action ${success?'ok':'err'}`;
+  chip.innerHTML=`<span class="tool-dot"></span>${toolName}`;
   el.appendChild(document.createElement('br'));
   el.appendChild(chip);
-  document.getElementById('chat').scrollTop = document.getElementById('chat').scrollHeight;
+  document.getElementById('chat').scrollTop=document.getElementById('chat').scrollHeight;
 }
 
-// ═══════════════════════════════════════════════
-// ENVOI
-// ═══════════════════════════════════════════════
+/* ═══════════════════════════════════════════════
+   ENVOI
+════════════════════════════════════════════════ */
 function sendMessage() {
-  const input = document.getElementById('textInput');
-  const text = input.value.trim();
+  const input=document.getElementById('textInput');
+  const text=input.value.trim();
   if (!text) return;
-
-  addUserMsg(text);
-  input.value = '';
-
-  if (!ws || ws.readyState !== WebSocket.OPEN) {
-    addSystemMsg('Non connecté au serveur. Configure les paramètres (⚙).', true);
-    return;
-  }
-
-  setState('processing');
-  addThinking();
-  ws.send(JSON.stringify({ type: 'message', content: text }));
+  addUserMsg(text); input.value='';
+  if (!ws||ws.readyState!==WebSocket.OPEN) { addSystemMsg('Non connecté. Configure les paramètres (⚙).',true); return; }
+  setState('processing'); addThinking();
+  ws.send(JSON.stringify({type:'message',content:text}));
 }
+document.getElementById('textInput').addEventListener('keydown', e => { if (e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();} });
 
-document.getElementById('textInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
-});
-
-// ═══════════════════════════════════════════════
-// AUDIO ANALYSER — réactivité de la sphère au volume du micro
-// ═══════════════════════════════════════════════
-let audioCtx = null;
-let analyser = null;
-let audioBuffer = null;
-let micStream = null;
-let audioLevel = 0;       // 0..1 : niveau lissé du micro
-let audioActive = false;
+/* ═══════════════════════════════════════════════
+   AUDIO ANALYSER
+════════════════════════════════════════════════ */
+let audioCtx=null,analyser=null,audioBuffer=null,micStream=null,audioLevel=0,audioActive=false;
 
 async function startAudioAnalysis() {
   try {
-    if (!micStream) {
-      micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    }
-    if (!audioCtx) {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    if (audioCtx.state === 'suspended') await audioCtx.resume();
+    if (!micStream) micStream=await navigator.mediaDevices.getUserMedia({audio:true});
+    if (!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    if (audioCtx.state==='suspended') await audioCtx.resume();
     if (!analyser) {
-      analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 256;
-      analyser.smoothingTimeConstant = 0.6;
-      audioBuffer = new Uint8Array(analyser.frequencyBinCount);
-      const src = audioCtx.createMediaStreamSource(micStream);
-      src.connect(analyser);
+      analyser=audioCtx.createAnalyser(); analyser.fftSize=256; analyser.smoothingTimeConstant=0.6;
+      audioBuffer=new Uint8Array(analyser.frequencyBinCount);
+      audioCtx.createMediaStreamSource(micStream).connect(analyser);
     }
-    audioActive = true;
-  } catch (e) {
-    console.warn('Micro refusé ou indisponible :', e);
-    audioActive = false;
-  }
+    audioActive=true;
+  } catch(e) { console.warn('Micro indisponible:',e); audioActive=false; }
 }
-
 function stopAudioAnalysis() {
-  audioActive = false;
-  audioLevel = 0;
-  if (micStream) {
-    micStream.getTracks().forEach(t => t.stop());
-    micStream = null;
-  }
-  analyser = null;
-  audioBuffer = null;
+  audioActive=false; audioLevel=0;
+  if (micStream){micStream.getTracks().forEach(t=>t.stop());micStream=null;}
+  analyser=null; audioBuffer=null;
 }
-
 function readAudioLevel() {
-  if (!audioActive || !analyser || !audioBuffer) return 0;
+  if (!audioActive||!analyser||!audioBuffer) return 0;
   analyser.getByteFrequencyData(audioBuffer);
-  let sum = 0;
-  for (let i = 0; i < audioBuffer.length; i++) sum += audioBuffer[i];
-  const avg = sum / audioBuffer.length;            // 0..255
-  // Lissage exponentiel pour éviter les saccades, normalisé 0..1
-  const target = Math.min(1, avg / 100);
-  audioLevel = audioLevel + (target - audioLevel) * 0.25;
+  let sum=0;
+  for (let i=0;i<audioBuffer.length;i++) sum+=audioBuffer[i];
+  const target=Math.min(1,(sum/audioBuffer.length)/100);
+  audioLevel=audioLevel+(target-audioLevel)*0.25;
   return audioLevel;
 }
 
-// ═══════════════════════════════════════════════
-// VOIX — Speech Recognition
-// ═══════════════════════════════════════════════
-let recognition = null;
-let isListening = false;
+/* ═══════════════════════════════════════════════
+   SPEECH RECOGNITION
+════════════════════════════════════════════════ */
+let recognition=null, isListening=false;
 
 function setupSpeech() {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) {
-    document.getElementById('micBtn').title = 'Reconnaissance vocale non supportée';
-    return;
-  }
-  recognition = new SpeechRecognition();
-  recognition.lang = 'fr-FR';
-  recognition.continuous = false;
-  recognition.interimResults = false;
-
-  recognition.onresult = (e) => {
-    const text = e.results[0][0].transcript;
-    document.getElementById('textInput').value = text;
-    stopListening();
-    sendMessage();
-  };
-
-  recognition.onerror = () => stopListening();
-  recognition.onend = () => { if (isListening) stopListening(); };
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if (!SR) return;
+  recognition=new SR(); recognition.lang='fr-FR'; recognition.continuous=false; recognition.interimResults=false;
+  recognition.onresult=(e)=>{ document.getElementById('textInput').value=e.results[0][0].transcript; stopListening(); sendMessage(); };
+  recognition.onerror=()=>stopListening();
+  recognition.onend=()=>{ if (isListening) stopListening(); };
 }
-
-function toggleMic() {
-  if (isListening) stopListening();
-  else startListening();
-}
-
+function toggleMic() { isListening ? stopListening() : startListening(); }
 function startListening() {
-  if (!recognition) { addSystemMsg('Micro non supporté par ce navigateur', true); return; }
-  isListening = true;
-  setState('listening');
+  if (!recognition){addSystemMsg('Micro non supporté',true);return;}
+  isListening=true; setState('listening');
   document.getElementById('micBtn').classList.add('listening');
-  startAudioAnalysis();        // ouvre l'analyse audio en parallèle
-  recognition.start();
+  startAudioAnalysis(); recognition.start();
 }
-
 function stopListening() {
-  isListening = false;
-  if (sphereState === 'listening') setState('idle');
+  isListening=false; if (sphereState==='listening') setState('idle');
   document.getElementById('micBtn').classList.remove('listening');
-  try { recognition?.stop(); } catch(e) {}
-  stopAudioAnalysis();
+  try{recognition?.stop();}catch(e){} stopAudioAnalysis();
 }
 
-// ═══════════════════════════════════════════════
-// SYNTHÈSE VOCALE (TTS)
-// ═══════════════════════════════════════════════
-// Préférences de voix masculine française (par OS) — par ordre de préférence
-const MALE_FR_VOICES = [
-  'paul', 'thomas', 'henri', 'daniel', 'nicolas', 'jacques', 'antoine', // courants
-  'microsoft paul', 'google français',                                   // Windows / Chrome
-  'aurélie', 'amélie' // fallback fr (mais féminines) — utilisées en dernier recours
-];
-
+/* ═══════════════════════════════════════════════
+   TTS
+════════════════════════════════════════════════ */
+const MALE_FR_VOICES=['paul','thomas','henri','daniel','nicolas','jacques','antoine','microsoft paul','google français','aurélie','amélie'];
 function pickFrenchVoice() {
-  const voices = window.speechSynthesis.getVoices();
+  const voices=window.speechSynthesis.getVoices();
   if (!voices.length) return null;
-  const fr = voices.filter(v => v.lang.toLowerCase().startsWith('fr'));
+  const fr=voices.filter(v=>v.lang.toLowerCase().startsWith('fr'));
   if (!fr.length) return voices[0];
-  // Cherche une voix masculine connue
-  for (const pref of MALE_FR_VOICES) {
-    const m = fr.find(v => v.name.toLowerCase().includes(pref));
-    if (m) return m;
-  }
+  for (const pref of MALE_FR_VOICES) { const m=fr.find(v=>v.name.toLowerCase().includes(pref)); if (m) return m; }
   return fr[0];
 }
-
 function cleanForSpeech(text) {
-  let t = text;
-
-  // 1. Blocs de code et code inline (souvent illisibles à voix haute)
-  t = t.replace(/```[\s\S]*?```/g, ' ');
-  t = t.replace(/`([^`]+)`/g, '$1');
-
-  // 2. Liens et images markdown : on garde le texte du lien
-  t = t.replace(/!?\[([^\]]+)\]\([^)]+\)/g, '$1');
-
-  // 3. Séparateurs horizontaux sur leur propre ligne : ---, ***, ___
-  t = t.replace(/^\s*[-*_]{3,}\s*$/gm, '');
-
-  // 4. EMOJIS et symboles pictographiques (lus littéralement par les voix Windows)
-  //    Couvre : émojis Unicode, drapeaux, dingbats, symboles divers
-  t = t.replace(/[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\u{2600}-\u{27BF}]/gu, ' ');
-  // Sélecteurs de variation et ZWJ qui restent après suppression des emojis
-  t = t.replace(/[‍️⃣]/g, '');
-  // Bullets Unicode (•, ‣, ▪, ▫, ◦, ★, ✓...)
-  t = t.replace(/[•‣◦▪▫★☆✓✔✗]/g, '');
-
-  // 5. Marqueurs markdown
-  t = t.replace(/^#{1,6}\s+/gm, '');                      // titres : ##, ###...
-  t = t.replace(/\*{1,3}([^*\n]+)\*{1,3}/g, '$1');        // **gras**, *italique*
-  t = t.replace(/_{2,3}([^_\n]+)_{2,3}/g, '$1');          // __gras__
-  t = t.replace(/^\s*[-*+]\s+/gm, '');                    // puces : -, *, +
-  t = t.replace(/^\s*\d+[.)]\s+/gm, '');                  // listes numérotées : 1., 2)
-  t = t.replace(/^\s*>\s+/gm, '');                        // citations : >
-
-  // 6. Tirets longs → pauses ; tirets isolés (entre espaces) → virgule
-  t = t.replace(/[—–]/g, ', ');
-  t = t.replace(/\s-\s/g, ', ');
-
-  // 7. Sauts de ligne → pauses
-  t = t.replace(/\n{2,}/g, '. ');
-  t = t.replace(/\n/g, ' ');
-
-  // 8. Nettoyage final
-  t = t.replace(/\s+([.,;:!?])/g, '$1');                  // espaces avant ponctuation
-  t = t.replace(/([.,;:!?]){2,}/g, '$1');                 // ponctuation dupliquée
-  t = t.replace(/\s{2,}/g, ' ');
+  let t=text;
+  t=t.replace(/```[\s\S]*?```/g,' '); t=t.replace(/`([^`]+)`/g,'$1');
+  t=t.replace(/!?\[([^\]]+)\]\([^)]+\)/g,'$1');
+  t=t.replace(/^\s*[-*_]{3,}\s*$/gm,'');
+  t=t.replace(/[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\u{2600}-\u{27BF}]/gu,' ');
+  t=t.replace(/[•‣◦▪▫★☆✓✔✗]/g,'');
+  t=t.replace(/^#{1,6}\s+/gm,''); t=t.replace(/\*{1,3}([^*\n]+)\*{1,3}/g,'$1');
+  t=t.replace(/_{2,3}([^_\n]+)_{2,3}/g,'$1'); t=t.replace(/^\s*[-*+]\s+/gm,'');
+  t=t.replace(/^\s*\d+[.)]\s+/gm,''); t=t.replace(/^\s*>\s+/gm,'');
+  t=t.replace(/[—–]/g,', '); t=t.replace(/\s-\s/g,', ');
+  t=t.replace(/\n{2,}/g,'. '); t=t.replace(/\n/g,' ');
+  t=t.replace(/\s+([.,;:!?])/g,'$1'); t=t.replace(/([.,;:!?]){2,}/g,'$1'); t=t.replace(/\s{2,}/g,' ');
   return t.trim();
 }
-
-// Découpe un long texte en phrases pour que la synthèse n'ait pas de "blanc" final
-function chunkText(text, maxLen = 280) {
-  const sentences = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [text];
-  const chunks = [];
-  let buf = '';
-  for (const s of sentences) {
-    if ((buf + s).length > maxLen && buf) { chunks.push(buf.trim()); buf = ''; }
-    buf += s;
-  }
+function chunkText(text, maxLen=280) {
+  const sentences=text.match(/[^.!?]+[.!?]+|[^.!?]+$/g)||[text];
+  const chunks=[]; let buf='';
+  for (const s of sentences) { if ((buf+s).length>maxLen&&buf){chunks.push(buf.trim());buf='';} buf+=s; }
   if (buf.trim()) chunks.push(buf.trim());
   return chunks;
 }
-
 function speak(text) {
   if (!window.speechSynthesis) return;
   window.speechSynthesis.cancel();
-
-  const clean = cleanForSpeech(text);
-  if (!clean) { setState('idle'); return; }
-
-  const voice = pickFrenchVoice();
-  const chunks = chunkText(clean, 280);
+  const clean=cleanForSpeech(text);
+  if (!clean){setState('idle');return;}
+  const voice=pickFrenchVoice(), chunks=chunkText(clean,280);
   setState('speaking');
-
-  chunks.forEach((chunk, i) => {
-    const utter = new SpeechSynthesisUtterance(chunk);
-    utter.lang = 'fr-FR';
-    utter.rate = 1.0;
-    utter.pitch = 0.8;     // un peu grave pour le côté Jarvis
-    utter.volume = 1.0;
-    if (voice) utter.voice = voice;
-    if (i === chunks.length - 1) utter.onend = () => setState('idle');
-    window.speechSynthesis.speak(utter);
+  chunks.forEach((chunk,i)=>{
+    const u=new SpeechSynthesisUtterance(chunk);
+    u.lang='fr-FR'; u.rate=1.0; u.pitch=0.8; u.volume=1.0;
+    if (voice) u.voice=voice;
+    if (i===chunks.length-1) u.onend=()=>setState('idle');
+    window.speechSynthesis.speak(u);
   });
 }
 
-// ═══════════════════════════════════════════════
-// UI HELPERS
-// ═══════════════════════════════════════════════
-function toggleConfig() {
-  document.getElementById('configPanel').classList.toggle('open');
-}
-
-// Charge les voix au démarrage (certains navigateurs les chargent async)
-if (window.speechSynthesis) {
-  speechSynthesis.getVoices();
-  speechSynthesis.onvoiceschanged = () => speechSynthesis.getVoices();
-}
-
+/* ═══════════════════════════════════════════════
+   UI HELPERS
+════════════════════════════════════════════════ */
+function toggleConfig() { document.getElementById('configPanel').classList.toggle('open'); }
+if (window.speechSynthesis) { speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged=()=>speechSynthesis.getVoices(); }
 setupSpeech();
 </script>
 </body>
