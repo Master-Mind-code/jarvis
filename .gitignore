@@ -33,6 +33,10 @@ Thumbs.db
 *.log
 logs/
 
+# Trading runtime data (positions, history, queues d'ordres)
+data/
+*.ex5
+
 # Builds / artefacts
 dist/
 build/

@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JARVIS — Trading</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #06090f; --bg2: #0d1425; --bg3: #111b30; --bg4: #0a1020;
+  --cyan: #00d4ff; --cyan2: rgba(0,212,255,0.15); --cyan3: rgba(0,212,255,0.06);
+  --green: #00e676; --green2: rgba(0,230,118,0.12);
+  --red: #ff4466; --red2: rgba(255,68,102,0.12);
+  --gold: #ffd700; --gold2: rgba(255,215,0,0.12);
+  --purple: #b060ff; --purple2: rgba(176,96,255,0.12);
+  --text: #c8e8ff; --text2: #6a9ab8; --text3: #3a6a8a;
+  --border: #0d3a5a; --border2: rgba(0,212,255,0.2);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:var(--bg); color:var(--text); font-family:'Rajdhani',sans-serif; min-height:100vh; overflow-x:hidden; }
+body::before { content:''; position:fixed; inset:0; background-image:linear-gradient(rgba(0,212,255,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,0.025) 1px,transparent 1px); background-size:40px 40px; pointer-events:none; z-index:0; }
+
+/* ── Header ── */
+header { position:relative; z-index:10; display:flex; align-items:center; justify-content:space-between; padding:12px 24px; border-bottom:1px solid var(--border); background:rgba(6,9,15,0.96); gap:16px; flex-wrap:wrap; }
+.logo { font-family:'Orbitron',monospace; font-size:16px; font-weight:900; letter-spacing:6px; color:var(--cyan); text-shadow:0 0 15px rgba(0,212,255,0.5); white-space:nowrap; }
+.logo span { color:#fff; }
+
+.back-btn { font-family:'Orbitron',monospace; font-size:9px; letter-spacing:2px; padding:6px 12px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); border-radius:2px; text-decoration:none; transition:all .2s; }
+.back-btn:hover { border-color:var(--cyan); color:var(--cyan); background:var(--cyan3); }
+
+.header-mid { display:flex; gap:20px; align-items:center; flex-wrap:wrap; }
+.ticker { font-family:'Share Tech Mono',monospace; font-size:13px; }
+.ticker span { color:var(--text2); font-size:11px; letter-spacing:1px; }
+.price-bid { color:var(--green); }
+.price-ask { color:var(--red); }
+
+.sys-status { display:flex; align-items:center; gap:8px; font-family:'Orbitron',monospace; font-size:9px; letter-spacing:2px; }
+.sys-dot { width:8px; height:8px; border-radius:50%; }
+.sys-dot.active { background:var(--green); box-shadow:0 0 8px var(--green); animation:blink 1s ease-in-out infinite; }
+.sys-dot.idle { background:var(--text3); }
+.sys-dot.error { background:var(--red); }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* ── Layout ── */
+.layout { position:relative; z-index:5; display:grid; grid-template-columns:1fr 1fr 1fr; grid-template-rows:auto auto auto; gap:12px; padding:16px; max-width:1400px; margin:0 auto; }
+
+/* ── Cards ── */
+.card { background:var(--bg2); border:1px solid var(--border); border-radius:4px; overflow:hidden; }
+.card-head { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; border-bottom:1px solid var(--border); }
+.card-title { font-family:'Orbitron',monospace; font-size:9px; letter-spacing:3px; text-transform:uppercase; color:var(--text2); }
+.card-body { padding:14px; }
+
+/* ── Control Panel ── */
+.control-panel { grid-column: 1 / -1; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+.btn { font-family:'Orbitron',monospace; font-size:9px; letter-spacing:2px; text-transform:uppercase; padding:9px 18px; border-radius:3px; cursor:pointer; border:1px solid; transition:all .2s; white-space:nowrap; }
+.btn-start { background:var(--green2); border-color:var(--green); color:var(--green); }
+.btn-start:hover { background:rgba(0,230,118,0.25); box-shadow:0 0 12px rgba(0,230,118,0.3); }
+.btn-stop { background:var(--red2); border-color:var(--red); color:var(--red); }
+.btn-stop:hover { background:rgba(255,68,102,0.25); }
+.btn-close-all { background:rgba(255,215,0,0.1); border-color:var(--gold); color:var(--gold); }
+.btn-close-all:hover { background:rgba(255,215,0,0.2); }
+.btn-connect { background:var(--cyan2); border-color:var(--cyan); color:var(--cyan); }
+.btn-connect:hover { background:rgba(0,212,255,0.25); }
+.btn:disabled { opacity:0.4; cursor:not-allowed; }
+
+.param-row { display:flex; align-items:center; gap:8px; }
+.param-label { font-family:'Orbitron',monospace; font-size:9px; letter-spacing:1px; color:var(--text2); white-space:nowrap; }
+.param-input { background:var(--bg3); border:1px solid var(--border); border-radius:2px; color:var(--text); font-family:'Share Tech Mono',monospace; font-size:12px; padding:5px 8px; width:70px; outline:none; }
+.param-input:focus { border-color:var(--cyan); }
+
+/* ── Stats ── */
+.stats-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+.stat-box { background:var(--bg3); border:1px solid var(--border); border-radius:3px; padding:10px 12px; text-align:center; }
+.stat-val { font-family:'Share Tech Mono',monospace; font-size:18px; font-weight:600; line-height:1; margin-bottom:4px; }
+.stat-lbl { font-family:'Orbitron',monospace; font-size:8px; letter-spacing:2px; color:var(--text2); text-transform:uppercase; }
+.stat-val.green { color:var(--green); }
+.stat-val.red { color:var(--red); }
+.stat-val.cyan { color:var(--cyan); }
+.stat-val.gold { color:var(--gold); }
+
+/* ── Open Trades ── */
+.trades-list { display:flex; flex-direction:column; gap:6px; max-height:260px; overflow-y:auto; }
+.trades-list::-webkit-scrollbar { width:3px; }
+.trades-list::-webkit-scrollbar-thumb { background:var(--border); }
+
+.trade-row { display:grid; grid-template-columns:60px 50px 70px 80px 80px 80px 1fr; gap:8px; align-items:center; background:var(--bg3); border:1px solid var(--border); border-radius:3px; padding:8px 10px; font-family:'Share Tech Mono',monospace; font-size:11px; transition:border-color .2s; }
+.trade-row:hover { border-color:var(--border2); }
+.trade-row .type-buy { color:var(--green); font-weight:600; }
+.trade-row .type-sell { color:var(--red); font-weight:600; }
+.trade-row .profit-pos { color:var(--green); }
+.trade-row .profit-neg { color:var(--red); }
+.trade-row .lbl { font-family:'Orbitron',monospace; font-size:8px; color:var(--text2); display:block; margin-bottom:1px; }
+.trade-row .close-btn { background:var(--red2); border:1px solid var(--red); color:var(--red); font-family:'Orbitron',monospace; font-size:8px; letter-spacing:1px; padding:3px 8px; border-radius:2px; cursor:pointer; width:fit-content; }
+
+/* ── History ── */
+.history-head { display:grid; grid-template-columns:50px 50px 80px 80px 80px 80px 1fr; gap:8px; padding:6px 10px; font-family:'Orbitron',monospace; font-size:8px; letter-spacing:1px; color:var(--text3); text-transform:uppercase; border-bottom:1px solid var(--border); }
+.history-list { max-height:220px; overflow-y:auto; }
+.history-row { display:grid; grid-template-columns:50px 50px 80px 80px 80px 80px 1fr; gap:8px; padding:6px 10px; font-family:'Share Tech Mono',monospace; font-size:11px; border-bottom:1px solid rgba(13,58,90,0.4); transition:background .15s; }
+.history-row:hover { background:var(--bg3); }
+
+/* ── AI Signal Panel ── */
+.signal-panel { grid-column:span 1; }
+.signal-decision { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+.signal-badge { font-family:'Orbitron',monospace; font-size:14px; font-weight:700; letter-spacing:3px; padding:8px 18px; border-radius:3px; }
+.badge-buy  { background:var(--green2); border:1px solid var(--green); color:var(--green); }
+.badge-sell { background:var(--red2); border:1px solid var(--red); color:var(--red); }
+.badge-wait { background:rgba(100,100,100,0.1); border:1px solid #444; color:#888; }
+.confidence-bar { flex:1; height:6px; background:var(--bg3); border-radius:3px; overflow:hidden; }
+.confidence-fill { height:100%; border-radius:3px; transition:width .5s; }
+.signal-levels { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:10px; }
+.level-box { background:var(--bg3); border:1px solid var(--border); border-radius:3px; padding:8px 10px; }
+.level-name { font-family:'Orbitron',monospace; font-size:8px; letter-spacing:1px; color:var(--text2); margin-bottom:3px; }
+.level-val { font-family:'Share Tech Mono',monospace; font-size:13px; }
+.confluences { display:flex; flex-direction:column; gap:4px; }
+.confluence-item { display:flex; align-items:center; gap:6px; font-size:12px; }
+.conf-dot { width:5px; height:5px; border-radius:50%; background:var(--cyan); flex-shrink:0; }
+
+/* ── Live log ── */
+.log-panel { grid-column:span 2; }
+.log-list { max-height:150px; overflow-y:auto; padding:8px 0; }
+.log-item { display:flex; gap:10px; padding:4px 0; font-family:'Share Tech Mono',monospace; font-size:11px; border-bottom:1px solid rgba(13,58,90,0.3); }
+.log-time { color:var(--text3); width:50px; flex-shrink:0; }
+.log-info { color:var(--text); }
+.log-success { color:var(--green); }
+.log-warning { color:var(--gold); }
+.log-error { color:var(--red); }
+
+/* ── Responsive ── */
+@media (max-width:900px) {
+  .layout { grid-template-columns:1fr 1fr; }
+  .stats-grid { grid-template-columns:repeat(2,1fr); }
+  .trade-row, .history-row, .history-head { grid-template-columns:60px 50px 1fr 1fr 1fr; }
+  .trade-row > *:nth-child(n+6), .history-row > *:nth-child(n+6), .history-head > *:nth-child(n+6) { display:none; }
+}
+@media (max-width:600px) {
+  .layout { grid-template-columns:1fr; }
+  .stats-grid { grid-template-columns:repeat(2,1fr); }
+  .control-panel { flex-direction:column; align-items:flex-start; }
+}
+
+/* ── Animations ── */
+.flash-green { animation:flashG .5s ease; }
+.flash-red   { animation:flashR .5s ease; }
+@keyframes flashG { 0%,100%{background:var(--bg3)} 50%{background:rgba(0,230,118,0.15)} }
+@keyframes flashR { 0%,100%{background:var(--bg3)} 50%{background:rgba(255,68,102,0.15)} }
+
+.toast { position:fixed; top:70px; right:20px; z-index:1000; padding:10px 18px; border-radius:3px; font-family:'Orbitron',monospace; font-size:10px; letter-spacing:2px; text-transform:uppercase; animation:toastIn .3s ease; }
+@keyframes toastIn { from{opacity:0;transform:translateX(20px)} to{opacity:1;transform:none} }
+.toast-ok { background:var(--green2); border:1px solid var(--green); color:var(--green); }
+.toast-err { background:var(--red2); border:1px solid var(--red); color:var(--red); }
+.toast-info { background:var(--cyan2); border:1px solid var(--cyan); color:var(--cyan); }
+</style>
+</head>
+<body>
+
+<header>
+  <div style="display:flex;align-items:center;gap:14px;">
+    <a href="/" class="back-btn">◄ JARVIS</a>
+    <div class="logo">JAR<span>VIS</span> <span style="font-size:9px;letter-spacing:3px;color:var(--text2)">TRADER</span></div>
+  </div>
+
+  <div class="header-mid">
+    <div class="ticker">
+      <span>BID</span> <span class="price-bid" id="hBid">—</span>
+      &nbsp;&nbsp;
+      <span>ASK</span> <span class="price-ask" id="hAsk">—</span>
+      &nbsp;&nbsp;
+      <span>SPREAD</span> <span id="hSpread" style="color:var(--text2)">—</span>
+    </div>
+    <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text2)" id="hAccount"></div>
+  </div>
+
+  <div class="sys-status">
+    <div class="sys-dot idle" id="sysDot"></div>
+    <span id="sysLabel">HORS LIGNE</span>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- ── Control Bar ── -->
+  <div class="card control-panel">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 14px;">
+      <button class="btn btn-connect" onclick="connectDashboard()">⚡ CONNECTER</button>
+      <button class="btn btn-start" onclick="startTrading()" id="btnStart">▶ DÉMARRER</button>
+      <button class="btn btn-stop" onclick="stopTrading()" id="btnStop" disabled>■ ARRÊTER</button>
+      <button class="btn btn-close-all" onclick="closeAll()">✕ CLÔTURER TOUT</button>
+
+      <div class="param-row">
+        <span class="param-label">RISQUE %</span>
+        <input class="param-input" type="number" id="paramRisk" value="1" min="0.1" max="5" step="0.1">
+      </div>
+      <div class="param-row">
+        <span class="param-label">CONFIANCE MIN</span>
+        <input class="param-input" type="number" id="paramConf" value="72" min="50" max="95" step="1">
+      </div>
+      <div class="param-row">
+        <span class="param-label">MAX TRADES</span>
+        <input class="param-input" type="number" id="paramMax" value="3" min="1" max="10" step="1">
+      </div>
+
+      <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+        <span class="param-label">TOKEN</span>
+        <input style="width:200px" class="param-input" type="password" id="cfgToken" placeholder="JARVIS_SECRET_TOKEN">
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Stats ── -->
+  <div class="card" style="grid-column:span 3">
+    <div class="card-head"><span class="card-title">Statistiques</span><span id="statsPeriod" style="font-size:10px;color:var(--text2)"></span></div>
+    <div class="card-body">
+      <div class="stats-grid">
+        <div class="stat-box"><div class="stat-val cyan" id="sTotalTrades">—</div><div class="stat-lbl">Trades</div></div>
+        <div class="stat-box"><div class="stat-val green" id="sWinrate">—%</div><div class="stat-lbl">Win Rate</div></div>
+        <div class="stat-box"><div class="stat-val green" id="sNetPnl">—</div><div class="stat-lbl">Net P&L $</div></div>
+        <div class="stat-box"><div class="stat-val gold" id="sAvgRR">—</div><div class="stat-lbl">RR Moyen</div></div>
+        <div class="stat-box"><div class="stat-val green" id="sTotalProfit">—</div><div class="stat-lbl">Profit total</div></div>
+        <div class="stat-box"><div class="stat-val red" id="sTotalLoss">—</div><div class="stat-lbl">Perte totale</div></div>
+        <div class="stat-box"><div class="stat-val green" id="sBestTrade">—</div><div class="stat-lbl">Meilleur trade</div></div>
+        <div class="stat-box"><div class="stat-val red" id="sWorstTrade">—</div><div class="stat-lbl">Pire trade</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Open Trades ── -->
+  <div class="card" style="grid-column:span 2">
+    <div class="card-head">
+      <span class="card-title">Positions ouvertes</span>
+      <span id="openCount" style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--cyan)">0 trade(s) | P&L: —</span>
+    </div>
+    <div class="card-body" style="padding:8px">
+      <div class="trades-list" id="openTradesList">
+        <div style="text-align:center;padding:20px;color:var(--text3);font-family:'Orbitron',monospace;font-size:10px;letter-spacing:2px">AUCUNE POSITION</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── AI Signal ── -->
+  <div class="card signal-panel">
+    <div class="card-head"><span class="card-title">Signal IA — Dernière analyse</span></div>
+    <div class="card-body">
+      <div class="signal-decision">
+        <div class="signal-badge badge-wait" id="sigBadge">WAIT</div>
+        <div style="flex:1">
+          <div class="confidence-bar"><div class="confidence-fill" id="confFill" style="width:0%;background:var(--text3)"></div></div>
+          <div style="font-family:'Orbitron',monospace;font-size:8px;color:var(--text2);margin-top:3px">CONFIANCE : <span id="confVal">—</span>%</div>
+        </div>
+      </div>
+      <div class="signal-levels" id="sigLevels">
+        <div class="level-box"><div class="level-name">ENTRÉE</div><div class="level-val" id="sigEntry">—</div></div>
+        <div class="level-box"><div class="level-name">STOP LOSS</div><div class="level-val" style="color:var(--red)" id="sigSL">—</div></div>
+        <div class="level-box"><div class="level-name">TP1</div><div class="level-val" style="color:var(--green)" id="sigTP1">—</div></div>
+        <div class="level-box"><div class="level-name">R/R</div><div class="level-val" style="color:var(--gold)" id="sigRR">—</div></div>
+      </div>
+      <div id="sigAnalysis" style="font-size:12px;color:var(--text2);line-height:1.5;min-height:40px;margin-bottom:8px"></div>
+      <div class="confluences" id="sigConf"></div>
+      <div style="margin-top:10px;font-family:'Orbitron',monospace;font-size:8px;color:var(--text3)" id="sigTime"></div>
+    </div>
+  </div>
+
+  <!-- ── History ── -->
+  <div class="card" style="grid-column:span 3">
+    <div class="card-head"><span class="card-title">Historique des trades</span></div>
+    <div class="history-head">
+      <span>#</span><span>TYPE</span><span>ENTRÉE</span><span>SORTIE</span><span>SL</span><span>TP</span><span>P&L</span>
+    </div>
+    <div class="history-list" id="historyList">
+      <div style="text-align:center;padding:16px;color:var(--text3);font-family:'Orbitron',monospace;font-size:10px;letter-spacing:2px">AUCUN HISTORIQUE</div>
+    </div>
+  </div>
+
+  <!-- ── Log ── -->
+  <div class="card log-panel">
+    <div class="card-head"><span class="card-title">Journal système</span><button onclick="clearLog()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:10px">Effacer</button></div>
+    <div class="card-body" style="padding:4px 10px">
+      <div class="log-list" id="logList"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ── Auto-config (URL = même origine que la page, token via ?token= ou localStorage) ── */
+const TOKEN_KEY = 'jarvis_trading_token';
+
+(function autoConfig() {
+  const params = new URLSearchParams(location.search);
+  const tokenFromUrl = params.get('token');
+  const tokenInput   = document.getElementById('cfgToken');
+  if (tokenFromUrl) {
+    tokenInput.value = tokenFromUrl;
+    try { localStorage.setItem(TOKEN_KEY, tokenFromUrl); } catch(_){}
+    // Nettoie l'URL pour ne pas exposer le token dans l'historique
+    history.replaceState({}, '', location.pathname);
+  } else {
+    try { tokenInput.value = localStorage.getItem(TOKEN_KEY) || ''; } catch(_){}
+  }
+})();
+
+const HTTP_BASE = () => `${location.protocol}//${location.host}`;
+const WS_BASE   = () => `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}`;
+const TOKEN     = () => document.getElementById('cfgToken').value.trim();
+const headers   = () => ({ 'Content-Type':'application/json', 'X-Jarvis-Token': TOKEN() });
+
+let ws = null;
+let connected = false;
+let reconnectTimer = null;
+let heartbeatTimer = null;
+
+// ── Connexion WebSocket trading ──
+function connectDashboard() {
+  const token = TOKEN();
+  if (!token) { toast('Token requis', 'err'); return; }
+  try { localStorage.setItem(TOKEN_KEY, token); } catch(_){}
+
+  if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+  if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
+  const fullUrl = `${WS_BASE()}/api/trading/ws?token=${encodeURIComponent(token)}`;
+
+  // Détache tous les handlers de l'ancienne WS AVANT de la fermer,
+  // sinon son onclose déclencherait un setTimeout de reconnect en plus du nôtre
+  // → empilement de timers et boucle de fermeture toutes les 5 s.
+  if (ws) {
+    ws.onopen = ws.onclose = ws.onmessage = ws.onerror = null;
+    try { ws.close(); } catch(_){}
+  }
+  ws = new WebSocket(fullUrl);
+
+  ws.onopen = () => {
+    connected = true;
+    setStatus('active', 'EN LIGNE');
+    log('Connecté au serveur Jarvis', 'success');
+    toast('Connecté', 'ok');
+    // Heartbeat : garde la WS ouverte (sinon proxy/navigateur ferment au bout de ~30 s)
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    heartbeatTimer = setInterval(() => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        try { ws.send(JSON.stringify({ type: 'ping' })); } catch(_){}
+      }
+    }, 5000);
+  };
+
+  ws.onmessage = (e) => {
+    try { handleWsMessage(JSON.parse(e.data)); }
+    catch (err) { log('Message invalide reçu', 'error'); }
+  };
+
+  ws.onclose = () => {
+    connected = false;
+    if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
+    setStatus('idle', 'HORS LIGNE');
+    log('Connexion perdue, reconnexion dans 5s…', 'error');
+    reconnectTimer = setTimeout(connectDashboard, 5000);
+  };
+
+  ws.onerror = () => {
+    setStatus('error', 'ERREUR');
+  };
+}
+
+function handleWsMessage(msg) {
+  switch(msg.type) {
+    case 'init':
+      updateAll(msg.data);
+      break;
+    case 'market_update':
+      updateMarketTicker(msg.data);
+      updateOpenTrades(msg.data.open_positions || []);
+      break;
+    case 'analysis':
+      updateSignalPanel(msg.data);
+      break;
+    case 'trade_signal':
+      log(`Signal ${msg.data.action} | Entry:${msg.data.entry} SL:${msg.data.sl} TP:${msg.data.tp}`, 'warning');
+      toast(`SIGNAL ${msg.data.action}`, msg.data.action === 'BUY' ? 'ok' : 'err');
+      break;
+    case 'trade_executed':
+      log(`Trade exécuté #${msg.data.ticket} | ${msg.data.action}`, 'success');
+      toast('TRADE OUVERT', 'ok');
+      refreshStats();
+      break;
+    case 'system_status':
+      updateSystemStatus(msg.data);
+      break;
+    case 'close_all_requested':
+      log('Clôture de toutes les positions demandée', 'warning');
+      break;
+  }
+}
+
+function updateAll(data) {
+  if (data.stats)       updateStats(data.stats);
+  if (data.open_trades) updateOpenTrades(data.open_trades);
+  if (data.history)     updateHistory(data.history);
+  if (data.state)       updateSystemStatus(data.state);
+}
+
+// ── Ticker ──
+function updateMarketTicker(data) {
+  if (data.bid != null) document.getElementById('hBid').textContent = data.bid.toFixed(2);
+  if (data.ask != null) document.getElementById('hAsk').textContent = data.ask.toFixed(2);
+  if (data.spread !== undefined) document.getElementById('hSpread').textContent = data.spread;
+  if (data.account) {
+    const a = data.account;
+    document.getElementById('hAccount').textContent =
+      `Balance: ${a.balance?.toFixed(2)}$ | Equity: ${a.equity?.toFixed(2)}$ | Free: ${a.margin_free?.toFixed(2)}$`;
+  }
+}
+
+// ── Stats ──
+function updateStats(s) {
+  const set = (id, val, isPos) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = val;
+    if (isPos !== undefined) {
+      el.className = `stat-val ${isPos ? 'green' : isPos === false ? 'red' : 'cyan'}`;
+    }
+  };
+  set('sTotalTrades', s.total_trades ?? '—');
+  set('sWinrate',     (s.winrate ?? '—') + '%', s.winrate >= 50);
+  set('sNetPnl',      (s.net_pnl > 0 ? '+' : '') + (s.net_pnl?.toFixed(2) ?? '—') + '$', s.net_pnl >= 0);
+  set('sAvgRR',       s.avg_rr ? '1:' + s.avg_rr : '—');
+  set('sTotalProfit', '+' + (s.total_profit?.toFixed(2) ?? '—') + '$', true);
+  set('sTotalLoss',   '-' + (s.total_loss?.toFixed(2) ?? '—') + '$', false);
+  set('sBestTrade',   '+' + (s.best_trade?.toFixed(2) ?? '—') + '$', true);
+  set('sWorstTrade',  (s.worst_trade?.toFixed(2) ?? '—') + '$', false);
+}
+
+// ── Open Trades ──
+function updateOpenTrades(positions) {
+  const list = document.getElementById('openTradesList');
+  const pnl  = positions.reduce((s, p) => s + (p.profit || 0), 0);
+
+  document.getElementById('openCount').textContent =
+    `${positions.length} trade(s) | P&L: ${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}$`;
+  document.getElementById('openCount').style.color = pnl >= 0 ? 'var(--green)' : 'var(--red)';
+
+  if (!positions.length) {
+    list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3);font-family:\'Orbitron\',monospace;font-size:10px;letter-spacing:2px">AUCUNE POSITION</div>';
+    return;
+  }
+
+  list.innerHTML = positions.map(p => {
+    const typeClass = p.type === 'BUY' ? 'type-buy' : 'type-sell';
+    const pnlClass  = p.profit >= 0 ? 'profit-pos' : 'profit-neg';
+    const pnlStr    = (p.profit >= 0 ? '+' : '') + p.profit?.toFixed(2) + '$';
+    return `<div class="trade-row">
+      <span><span class="lbl">TICKET</span>#${p.ticket}</span>
+      <span class="${typeClass}">${p.type}</span>
+      <span><span class="lbl">LOT</span>${p.volume}</span>
+      <span><span class="lbl">ENTRÉE</span>${p.open_price?.toFixed(2)}</span>
+      <span><span class="lbl">SL</span>${p.sl?.toFixed(2) || '—'}</span>
+      <span><span class="lbl">TP</span>${p.tp?.toFixed(2) || '—'}</span>
+      <span class="${pnlClass}" style="font-weight:600">${pnlStr}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── History ──
+function updateHistory(history) {
+  const list = document.getElementById('historyList');
+  if (!history.length) return;
+  list.innerHTML = history.map(t => {
+    const pnl    = t.profit || 0;
+    const pnlCls = pnl >= 0 ? 'profit-pos' : 'profit-neg';
+    const pnlStr = (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + '$';
+    const typeCls = t.type === 'BUY' ? 'type-buy' : 'type-sell';
+    return `<div class="history-row">
+      <span>#${t.id || t.ticket}</span>
+      <span class="${typeCls}">${t.type}</span>
+      <span>${t.open_price?.toFixed(2) || '—'}</span>
+      <span>${t.close_price?.toFixed(2) || '—'}</span>
+      <span style="color:var(--red)">${t.sl?.toFixed(2) || '—'}</span>
+      <span style="color:var(--green)">${t.tp?.toFixed(2) || '—'}</span>
+      <span class="${pnlCls}">${pnlStr}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── AI Signal ──
+function updateSignalPanel(d) {
+  const decision = d.decision || 'WAIT';
+  const badge    = document.getElementById('sigBadge');
+  badge.textContent = decision;
+  badge.className   = `signal-badge badge-${decision.toLowerCase()}`;
+
+  const conf = d.confidence || 0;
+  document.getElementById('confVal').textContent = conf;
+  const fill = document.getElementById('confFill');
+  fill.style.width = conf + '%';
+  fill.style.background = conf >= 75 ? 'var(--green)' : conf >= 55 ? 'var(--gold)' : 'var(--red)';
+
+  document.getElementById('sigEntry').textContent = d.entry?.toFixed(2) || '—';
+  document.getElementById('sigSL').textContent    = d.sl?.toFixed(2) || '—';
+  document.getElementById('sigTP1').textContent   = d.tp1?.toFixed(2) || '—';
+  document.getElementById('sigRR').textContent    = d.rr ? '1:' + d.rr : '—';
+
+  const analysis = d.analysis || {};
+  document.getElementById('sigAnalysis').textContent =
+    analysis.reasoning || d.wait_reason || '—';
+
+  const confList = analysis.confluences || [];
+  document.getElementById('sigConf').innerHTML = confList.map(c =>
+    `<div class="confluence-item"><div class="conf-dot"></div><span>${c}</span></div>`
+  ).join('');
+
+  document.getElementById('sigTime').textContent = 'Analyse: ' + (d.analyzed_at || '—');
+
+  log(`Signal IA: ${decision} (${conf}%) | TF: ${d.timeframe_entry || '—'} | Stratégie: ${d.strategy || '—'}`,
+      decision !== 'WAIT' ? 'success' : 'info');
+}
+
+// ── System Status ──
+function updateSystemStatus(state) {
+  const active = state?.active;
+  setStatus(active ? 'active' : 'idle', active ? 'ACTIF' : 'INACTIF');
+  document.getElementById('btnStart').disabled = active;
+  document.getElementById('btnStop').disabled  = !active;
+}
+
+// ── Actions ──
+async function startTrading() {
+  const body = {
+    risk_percent:   parseFloat(document.getElementById('paramRisk').value),
+    min_confidence: parseInt(document.getElementById('paramConf').value),
+    max_trades:     parseInt(document.getElementById('paramMax').value),
+  };
+  const r = await fetch(`${HTTP_BASE()}/api/trading/start`, { method:'POST', headers:headers(), body:JSON.stringify(body) });
+  if (r.ok) { toast('Trading démarré', 'ok'); log('Système de trading démarré', 'success'); }
+  else toast('Erreur', 'err');
+}
+
+async function stopTrading() {
+  const r = await fetch(`${HTTP_BASE()}/api/trading/stop`, { method:'POST', headers:headers() });
+  if (r.ok) { toast('Trading arrêté', 'info'); log('Système de trading arrêté', 'warning'); }
+}
+
+async function closeAll() {
+  if (!confirm('Clôturer toutes les positions ?')) return;
+  const r = await fetch(`${HTTP_BASE()}/api/trading/close-all`, { method:'POST', headers:headers() });
+  if (r.ok) { toast('Clôture envoyée', 'ok'); log('Clôture de toutes les positions', 'warning'); }
+}
+
+async function refreshStats() {
+  if (!connected) return;
+  const r = await fetch(`${HTTP_BASE()}/api/trading/stats`, { headers:headers() });
+  if (r.ok) {
+    const data = await r.json();
+    updateStats(data.stats);
+    updateOpenTrades(data.open_trades || []);
+    updateHistory(data.history || []);
+  }
+}
+
+// ── UI Helpers ──
+function setStatus(type, label) {
+  const dot = document.getElementById('sysDot');
+  dot.className = `sys-dot ${type}`;
+  document.getElementById('sysLabel').textContent = label;
+}
+
+function log(msg, type = 'info') {
+  const list = document.getElementById('logList');
+  const now  = new Date().toTimeString().slice(0,8);
+  const item = document.createElement('div');
+  item.className = 'log-item';
+  item.innerHTML = `<span class="log-time">${now}</span><span class="log-${type}">${msg}</span>`;
+  list.insertBefore(item, list.firstChild);
+  if (list.children.length > 100) list.removeChild(list.lastChild);
+}
+function clearLog() { document.getElementById('logList').innerHTML = ''; }
+
+function toast(msg, type = 'info') {
+  const t = document.createElement('div');
+  t.className = `toast toast-${type}`;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+// ── Init ──
+log('Dashboard Jarvis Trader initialisé', 'info');
+log('Renseigne le token et clique CONNECTER', 'info');
+
+// Connexion automatique si un token est déjà en mémoire
+if (TOKEN()) connectDashboard();
+
+// Rafraîchissement stats auto
+setInterval(refreshStats, 30000);
+</script>
+</body>
+</html>

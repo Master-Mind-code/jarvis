@@ -20,17 +20,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from dotenv import load_dotenv
 from server.orchestrator import process_request
+from server.trading.routes import router as trading_router
 
 load_dotenv()
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 UI_FILE = ROOT_DIR / "jarvis_ui.html"
+TRADING_UI_FILE = ROOT_DIR / "trading_dashboard.html"
 
 SECRET_TOKEN = os.getenv("JARVIS_SECRET_TOKEN", "jarvis_secret_change_me")
 RPC_TIMEOUT = float(os.getenv("JARVIS_RPC_TIMEOUT", "60"))
 
 app = FastAPI(title="Jarvis Server", version="2.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.include_router(trading_router)
 security = HTTPBearer()
 
 # Sessions controllers : {device_id: {"history": [...], "ws": WebSocket}}
@@ -51,6 +54,21 @@ def serve_ui():
     if UI_FILE.exists():
         return FileResponse(UI_FILE, media_type="text/html")
     return JSONResponse({"error": "jarvis_ui.html introuvable à la racine du projet"}, status_code=404)
+
+
+@app.get("/trading")
+def serve_trading_ui():
+    """Sert le dashboard de trading. no-cache pour faciliter les updates UI."""
+    if TRADING_UI_FILE.exists():
+        return FileResponse(
+            TRADING_UI_FILE,
+            media_type="text/html",
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+        )
+    return JSONResponse(
+        {"error": "trading_dashboard.html introuvable à la racine du projet"},
+        status_code=404,
+    )
 
 
 @app.get("/status")

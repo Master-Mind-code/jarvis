@@ -208,6 +208,33 @@ header {
 .btn-cfg:hover { border-color: var(--border-hi); color: var(--cyan); background: rgba(0,229,255,0.06); }
 .btn-cfg svg { width: 15px; height: 15px; }
 
+.btn-trading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 14px;
+  height: 36px;
+  border: 1px solid rgba(245,197,24,0.35);
+  background: rgba(245,197,24,0.08);
+  border-radius: 2px;
+  cursor: pointer;
+  color: var(--gold);
+  font-family: 'Orbitron', monospace;
+  font-size: 9px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  backdrop-filter: var(--panel-blur);
+}
+.btn-trading:hover {
+  background: rgba(245,197,24,0.18);
+  border-color: var(--gold);
+  box-shadow: 0 0 14px rgba(245,197,24,0.25);
+}
+.btn-trading svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+
 /* ══════════════════════════════════════════════
    MAIN LAYOUT
 ══════════════════════════════════════════════ */
@@ -939,6 +966,13 @@ header {
       <div class="s-dot"></div>
       <span id="connText">HORS LIGNE</span>
     </div>
+    <a href="/trading" class="btn-trading" id="btnTrading" title="Espace de trading" onclick="return openTrading(event)">
+      <svg viewBox="0 0 24 24">
+        <polyline points="3 17 9 11 13 15 21 7"/>
+        <polyline points="14 7 21 7 21 14"/>
+      </svg>
+      Trading
+    </a>
     <button class="btn-cfg" title="Paramètres" onclick="toggleConfig()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
         <circle cx="12" cy="12" r="3"/>
@@ -1742,6 +1776,26 @@ function speak(text) {
    UI HELPERS
 ════════════════════════════════════════════════ */
 function toggleConfig() { document.getElementById('configPanel').classList.toggle('open'); }
+
+/* Ouvre l'espace de trading dans un nouvel onglet en propageant le token. */
+function openTrading(evt) {
+  const token = (document.getElementById('cfgToken')?.value || '').trim();
+  const url = '/trading' + (token ? '?token=' + encodeURIComponent(token) : '');
+  // Si la page Jarvis n'est pas servie depuis le serveur (file://), on cible le serveur configuré.
+  if (location.protocol !== 'http:' && location.protocol !== 'https:') {
+    const cfg = (document.getElementById('cfgUrl')?.value || '').trim();
+    if (cfg) {
+      const httpBase = cfg.replace(/^ws/, 'http');
+      window.open(httpBase + url, '_blank');
+      if (evt) evt.preventDefault();
+      return false;
+    }
+  }
+  // Onglet courant non utilisé : on navigue
+  window.open(url, '_blank');
+  if (evt) evt.preventDefault();
+  return false;
+}
 if (window.speechSynthesis) { speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged=()=>speechSynthesis.getVoices(); }
 setupSpeech();
 </script>
