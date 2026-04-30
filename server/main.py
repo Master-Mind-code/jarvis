@@ -128,7 +128,11 @@ async def worker_endpoint(websocket: WebSocket, device_id: str):
 
     workers[device_id] = {"ws": websocket, "info": {"os": "unknown"}, "pending": {}}
     print(f"[worker +] {device_id} connecté")
-    await websocket.send_json({"type": "registered", "device_id": device_id})
+    try:
+        await websocket.send_json({"type": "registered", "device_id": device_id})
+    except (WebSocketDisconnect, RuntimeError):
+        print(f"[worker -] {device_id} (déconnecté avant ack)")
+        return
 
     try:
         while True:
@@ -183,7 +187,12 @@ async def controller_endpoint(websocket: WebSocket, device_id: str):
     session = controllers[device_id]
 
     print(f"[controller +] {device_id} connecté")
-    await websocket.send_json({"type": "connected", "device_id": device_id, "message": "Jarvis en ligne ✓"})
+    try:
+        await websocket.send_json({"type": "connected", "device_id": device_id, "message": "Jarvis en ligne ✓"})
+    except (WebSocketDisconnect, RuntimeError):
+        # Le client s'est déconnecté avant qu'on envoie le welcome (typique mobile)
+        print(f"[controller -] {device_id} (déconnecté avant welcome)")
+        return
 
     try:
         while True:
