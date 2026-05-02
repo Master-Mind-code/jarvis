@@ -1,0 +1,18 @@
+# Dépendances optionnelles pour les nouveaux tools Orion.
+# Installe avec : pip install -r requirements-extras.txt
+#
+# Tools concernés (le serveur fonctionne sans, ces tools retournent une erreur
+# explicite si la lib manque) :
+#   notify          → winotify (Windows) — sur Linux/macOS, utilise notify-send/osascript
+#   screenshot      → mss + pillow (cross-platform)
+#   read_pdf        → pypdf
+#   read_docx       → python-docx
+#   mouse_*, keyboard_* → pyautogui
+#
+# Note Windows : pyautogui demande pillow, déjà inclus via mss.
+winotify>=1.1.0; sys_platform == "win32"
+mss>=9.0.0
+pillow>=10.0.0
+pypdf>=4.0.0
+python-docx>=1.0.0
+pyautogui>=0.9.54

@@ -1,0 +1,26 @@
+name = "voice"
+description = "Assistant vocal local 100% français (STT Whisper + TTS Kokoro)"
+
+[env]
+ORION_PROVIDER = "anthropic"
+ORION_VOICE_STT_BACKEND = "faster-whisper"
+ORION_VOICE_STT_MODEL = "small"
+ORION_VOICE_STT_DEVICE = "cpu"
+ORION_VOICE_STT_COMPUTE = "int8"
+ORION_VOICE_STT_LANG = "fr"
+ORION_VOICE_TTS_BACKEND = "kokoro"
+ORION_VOICE_TTS_VOICE = "ff_siwis"
+ORION_VOICE_TTS_LANG = "fr-fr"
+ORION_VOICE_WAKE_WORDS = "hey orion,orion"
+ORION_VOICE_WAKE_ENABLED = "true"
+ORION_VOICE_WAKE_TIMEOUT = "120"
+
+[notes]
+required_secrets = ["ANTHROPIC_API_KEY", "ORION_SECRET_TOKEN"]
+post_setup = [
+    "Installe les deps voix : pip install -r requirements-voice.txt",
+    "Terminal 1 : python start.py server",
+    "Terminal 2 : python start.py voice",
+    "Au premier lancement, ~300 MB de modèles Kokoro seront téléchargés",
+    "Dis 'hey orion' pour activer l'écoute",
+]

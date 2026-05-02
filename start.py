@@ -8,7 +8,10 @@ Modes :
   python start.py cli                → lance la CLI standalone (pas besoin de serveur)
   python start.py worker             → lance l'agent en mode worker (à utiliser depuis un autre appareil)
   python start.py controller         → lance l'agent en mode chat controller (CLI distante)
+  python start.py voice              → lance le service voix locale (STT+TTS, parle "hey orion")
   python start.py ui                 → ouvre seulement l'UI navigateur
+  python start.py init               → liste les presets de configuration disponibles
+  python start.py init --preset NAME → applique un preset (trading, voice, worker, google, minimal)
   python start.py install-startup    → active le démarrage auto Windows (mode server, sans UI)
   python start.py remove-startup     → désactive le démarrage auto Windows
 
@@ -49,7 +52,9 @@ AUTOSTART_RUNNER = STARTUP_HELPER_DIR / "orion_autostart.cmd"
 AUTOSTART_VBS_NAME = "Orion Autostart.vbs"
 LEGACY_AUTOSTART_RUNNER = STARTUP_HELPER_DIR / f"{LEGACY_APP_SLUG}_autostart.cmd"
 LEGACY_AUTOSTART_VBS_NAME = f"{LEGACY_APP_NAME} Autostart.vbs"
-STARTUP_MODES = {"server", "cli", "worker", "controller", "ui"}
+STARTUP_MODES = {"server", "cli", "worker", "controller", "voice", "ui"}
+VOICE_REQ_FILE = ROOT / "requirements-voice.txt"
+PRESETS_DIR = ROOT / "presets"
 
 PYTHON = sys.executable
 
@@ -381,6 +386,210 @@ def run_agent(mode: str):
     subprocess.run([PYTHON, "agent/agent.py"], cwd=str(ROOT), env=env)
 
 
+def check_voice_deps():
+    """Vérifie que les dépendances voix sont présentes."""
+    missing = []
+    for pkg, mod in [
+        ("faster-whisper", "faster_whisper"),
+        ("kokoro-onnx", "kokoro_onnx"),
+        ("sounddevice", "sounddevice"),
+        ("webrtcvad-wheels", "webrtcvad"),
+        ("numpy", "numpy"),
+    ]:
+        try:
+            __import__(mod)
+        except ImportError:
+            missing.append(pkg)
+    if missing:
+        print(f"\n[!] Dépendances voix manquantes : {', '.join(missing)}")
+        print(f"    Installe avec :  {PYTHON} -m pip install -r requirements-voice.txt")
+        if not VOICE_REQ_FILE.exists():
+            print(f"    [!] {VOICE_REQ_FILE} introuvable.")
+            sys.exit(1)
+        choice = input("    Installer maintenant ? [y/N] ").strip().lower()
+        if choice == "y":
+            subprocess.check_call(
+                [PYTHON, "-m", "pip", "install", "-r", str(VOICE_REQ_FILE)]
+            )
+        else:
+            sys.exit(1)
+
+
+def run_voice():
+    print("\n→ Démarrage du service voix Orion...")
+    server_url = get_env("SERVER_URL")
+    if not server_url:
+        url = input(
+            f"  URL du serveur Orion [{get_server_http_url().replace('http', 'ws')}] : "
+        ).strip()
+        if not url:
+            url = get_server_http_url().replace("http", "ws")
+        os.environ[env_key("SERVER_URL")] = url
+        os.environ[env_key("SERVER_URL", legacy=True)] = url
+    secret_token = get_env("SECRET_TOKEN")
+    if not secret_token:
+        print("  [!] ORION_SECRET_TOKEN manquant. Mets-le dans .env.")
+        sys.exit(1)
+
+    # Avertissement si le serveur n'est pas joignable
+    port = get_server_port()
+    if not is_orion_server_online(port, timeout=1.5):
+        print(f"  [!] Aucun serveur Orion détecté sur http://127.0.0.1:{port}")
+        print("      Lance d'abord 'python start.py server' dans une autre fenêtre.")
+        choice = input("      Continuer quand même ? [y/N] ").strip().lower()
+        if choice != "y":
+            return
+
+    check_voice_deps()
+
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(ROOT) + os.pathsep + env.get("PYTHONPATH", "")
+    subprocess.run(
+        [PYTHON, "-m", "voice.voice_service"], cwd=str(ROOT), env=env
+    )
+
+
+def _load_toml(path: Path) -> dict:
+    """Lit un fichier TOML. tomllib (3.11+) sinon tomli en backport."""
+    try:
+        import tomllib  # type: ignore[import-not-found]
+    except ImportError:  # pragma: no cover — Python <3.11
+        try:
+            import tomli as tomllib  # type: ignore[import-not-found]
+        except ImportError:
+            print("[!] tomllib indisponible. Installe tomli : pip install tomli")
+            sys.exit(1)
+    with path.open("rb") as f:
+        return tomllib.load(f)
+
+
+def list_presets():
+    if not PRESETS_DIR.exists():
+        print(f"\n[i] Aucun preset trouvé dans {PRESETS_DIR}")
+        return
+    files = sorted(PRESETS_DIR.glob("*.toml"))
+    if not files:
+        print(f"\n[i] Aucun preset .toml dans {PRESETS_DIR}")
+        return
+    print("\nPresets disponibles :\n")
+    for path in files:
+        try:
+            data = _load_toml(path)
+        except Exception as exc:
+            print(f"  {path.stem:12s}  [!] {exc}")
+            continue
+        desc = data.get("description", "")
+        print(f"  {path.stem:12s}  {desc}")
+    print("\nApplique un preset avec :  python start.py init --preset <nom>")
+
+
+def _parse_env_file(path: Path) -> dict[str, str]:
+    """Parser .env minimal (pas de quotes ni multi-line, suffisant pour merge)."""
+    if not path.exists():
+        return {}
+    out: dict[str, str] = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        s = line.strip()
+        if not s or s.startswith("#") or "=" not in s:
+            continue
+        k, v = s.split("=", 1)
+        out[k.strip()] = v.strip().strip('"').strip("'")
+    return out
+
+
+def _merge_env(target: Path, additions: dict[str, str], header: str) -> tuple[int, int]:
+    """Merge `additions` dans `target`. Retourne (ajoutés, mis à jour)."""
+    existing = _parse_env_file(target)
+    added, updated = 0, 0
+    new_lines: list[str] = []
+    for k, v in additions.items():
+        if k in existing:
+            if existing[k] != v:
+                updated += 1
+            else:
+                continue  # même valeur → pas la peine d'ajouter
+        else:
+            added += 1
+        new_lines.append(f"{k}={v}")
+
+    if not new_lines:
+        return 0, 0
+
+    # On préserve l'existant et on rajoute une section commentée à la fin
+    block = ["", "", f"# ─── Preset : {header} ───"] + new_lines + [""]
+    if target.exists():
+        # Si la même section existe déjà, on l'écrase
+        original = target.read_text(encoding="utf-8")
+        marker = f"# ─── Preset : {header} ───"
+        if marker in original:
+            head = original.split(marker)[0].rstrip() + "\n"
+            target.write_text(head + "\n".join(block[2:]), encoding="utf-8")
+        else:
+            with target.open("a", encoding="utf-8") as f:
+                f.write("\n".join(block))
+    else:
+        target.write_text("\n".join(block[1:]), encoding="utf-8")
+    return added, updated
+
+
+def run_init(extra_args: list[str]):
+    if "--preset" not in extra_args:
+        list_presets()
+        return
+
+    idx = extra_args.index("--preset")
+    if idx + 1 >= len(extra_args):
+        print("[!] --preset attend un nom (ex: trading, voice, worker, google, minimal)")
+        list_presets()
+        sys.exit(1)
+    name = extra_args[idx + 1].strip().lower()
+    path = PRESETS_DIR / f"{name}.toml"
+    if not path.exists():
+        print(f"[!] Preset '{name}' introuvable.")
+        list_presets()
+        sys.exit(1)
+
+    print(f"\n→ Application du preset '{name}' depuis {path.name}")
+    data = _load_toml(path)
+    description = data.get("description", "")
+    if description:
+        print(f"  {description}\n")
+
+    env_block = data.get("env", {}) or {}
+    notes = data.get("notes", {}) or {}
+
+    if not ENV_FILE.exists() and ENV_EXAMPLE.exists():
+        print(f"[i] Pas de .env, copie depuis {ENV_EXAMPLE.name}")
+        ENV_FILE.write_text(ENV_EXAMPLE.read_text(encoding="utf-8"), encoding="utf-8")
+
+    added, updated = _merge_env(ENV_FILE, env_block, name)
+    if added or updated:
+        print(f"[OK] .env mis à jour : {added} variable(s) ajoutée(s), {updated} modifiée(s)")
+    else:
+        print("[i] Aucune variable d'env modifiée (déjà à jour ou bloc vide)")
+
+    required = notes.get("required_secrets") or []
+    missing_secrets = []
+    if required:
+        current = _parse_env_file(ENV_FILE)
+        for key in required:
+            value = current.get(key, "").strip()
+            if (not value
+                    or value.startswith("sk-ant-xxxx")
+                    or value.startswith("change_this")
+                    or value.startswith("xxxx")):
+                missing_secrets.append(key)
+        if missing_secrets:
+            print(f"\n[!] Secrets à renseigner dans .env : {', '.join(missing_secrets)}")
+
+    post = notes.get("post_setup") or []
+    if post:
+        print("\nProchaines étapes :")
+        for i, step in enumerate(post, 1):
+            print(f"  {i}. {step}")
+    print()
+
+
 def run_ui_only():
     if not UI_FILE.exists():
         print(f"  [!] {UI_FILE.name} introuvable.")
@@ -402,7 +611,8 @@ def menu():
         print("  [2] CLI standalone (mode local, pas de serveur)")
         print("  [3] Agent worker (cet appareil exécute des tools à distance)")
         print("  [4] Agent controller (chat distant)")
-        print("  [5] UI uniquement (le serveur tourne déjà ailleurs)")
+        print("  [5] Service voix locale (parle à Orion : 'hey orion')")
+        print("  [6] UI uniquement (le serveur tourne déjà ailleurs)")
         print("  [q] Quitter")
         choice = input("\n> ").strip().lower()
         if choice == "1":
@@ -414,6 +624,8 @@ def menu():
         elif choice == "4":
             run_agent("controller")
         elif choice == "5":
+            run_voice()
+        elif choice == "6":
             run_ui_only()
         elif choice in ("q", "quit", "exit"):
             return
@@ -439,7 +651,11 @@ def main():
         remove_windows_startup()
         return
 
-    if cmd in (None, "server", "cli", "worker", "controller"):
+    if cmd == "init":
+        run_init(extra_args)
+        return
+
+    if cmd in (None, "server", "cli", "worker", "controller", "voice"):
         check_env()
         check_deps()
 
@@ -451,6 +667,8 @@ def main():
         run_agent("worker")
     elif cmd == "controller":
         run_agent("controller")
+    elif cmd == "voice":
+        run_voice()
     elif cmd == "ui":
         run_ui_only()
     elif cmd is None:

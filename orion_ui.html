@@ -188,6 +188,20 @@ header {
 .status-pill.connected { border-color: rgba(0,255,163,0.35); color: var(--green); }
 .status-pill.connected .s-dot { background: var(--green); box-shadow: 0 0 8px var(--green); }
 
+/* ── Pill spécifique au service voix ── */
+.voice-pill { display: none; }
+.voice-pill.online { display: flex; }
+.voice-pill[data-state="idle"]      { border-color: rgba(0,229,255,0.20); color: var(--cyan); }
+.voice-pill[data-state="idle"] .s-dot       { background: var(--cyan); box-shadow: 0 0 6px var(--cyan); }
+.voice-pill[data-state="wake"]      { border-color: rgba(0,229,255,0.30); color: var(--cyan); }
+.voice-pill[data-state="wake"] .s-dot       { background: var(--cyan); box-shadow: 0 0 8px var(--cyan); animation: pulse-dot 1.6s ease-in-out infinite; }
+.voice-pill[data-state="listening"] { border-color: rgba(255,59,92,0.45); color: var(--red); }
+.voice-pill[data-state="listening"] .s-dot  { background: var(--red); box-shadow: 0 0 12px var(--red); animation: pulse-dot 0.6s ease-in-out infinite; }
+.voice-pill[data-state="thinking"]  { border-color: rgba(245,197,24,0.45); color: var(--gold); }
+.voice-pill[data-state="thinking"] .s-dot   { background: var(--gold); box-shadow: 0 0 10px var(--gold); animation: pulse-dot 0.9s ease-in-out infinite; }
+.voice-pill[data-state="speaking"]  { border-color: rgba(0,255,163,0.45); color: var(--green); }
+.voice-pill[data-state="speaking"] .s-dot   { background: var(--green); box-shadow: 0 0 10px var(--green); animation: pulse-dot 0.5s ease-in-out infinite; }
+
 .s-dot {
   width: 5px;
   height: 5px;
@@ -1006,6 +1020,10 @@ header {
       <div class="s-dot"></div>
       <span id="connText">HORS LIGNE</span>
     </div>
+    <div class="status-pill voice-pill" id="voicePill" data-state="idle" title="Service voix Orion">
+      <div class="s-dot"></div>
+      <span id="voiceText">VOIX</span>
+    </div>
     <a href="/trading" class="btn-trading" id="btnTrading" title="Espace de trading" onclick="return openTrading(event)">
       <svg viewBox="0 0 24 24">
         <polyline points="3 17 9 11 13 15 21 7"/>
@@ -1535,20 +1553,33 @@ drawSphere();
 /* ═══════════════════════════════════════════════
    PASSWORD GATE
 ════════════════════════════════════════════════ */
-const PASSWORD = 'press on';
+// Plusieurs variantes acceptées : couvre les approximations STT (français / Whisper).
+// Édite cette liste pour ajouter ton propre mot. Tous les mots sont normalisés
+// (minuscules, sans accents, sans ponctuation) avant comparaison.
+const PASSWORDS = ['ouverture', 'orion ouverture', 'ouvre toi', 'deverrouille', 'orion ouvre'];
 function normalizePwd(s) {
   return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+}
+function isPasswordMatch(input) {
+  const norm = normalizePwd(input);
+  if (!norm) return false;
+  return PASSWORDS.some(pwd => norm === pwd || norm.includes(pwd));
+}
+function unlockGate(welcome = 'Identifié. Bienvenue, Dominique.') {
+  const hint = document.getElementById('pwdHint');
+  if (hint) { hint.textContent = welcome; hint.className = 'pwd-hint success'; }
+  setTimeout(() => {
+    const gate = document.getElementById('passwordGate');
+    if (!gate) return;
+    gate.classList.add('hidden');
+    setTimeout(()=>gate.style.display='none', 700);
+  }, 600);
 }
 function checkPassword() {
   const input = document.getElementById('pwdInput').value;
   const hint  = document.getElementById('pwdHint');
-  if (normalizePwd(input)===PASSWORD) {
-    hint.textContent='Identifié. Bienvenue, Dominique.'; hint.className='pwd-hint success';
-    setTimeout(() => {
-      const gate=document.getElementById('passwordGate');
-      gate.classList.add('hidden');
-      setTimeout(()=>gate.style.display='none',700);
-    }, 600);
+  if (isPasswordMatch(input)) {
+    unlockGate();
   } else {
     hint.textContent='Mot de passe incorrect.'; hint.className='pwd-hint error';
     document.getElementById('pwdInput').value='';
@@ -1615,6 +1646,8 @@ function connect() {
     else if (data.type==='connected') addSystemMsg(data.message||'Connecté');
     else if (data.type==='error') { removeThinking(); setState('idle'); addSystemMsg('Erreur : '+(data.content||'inconnue'),true); }
     else if (data.type==='info') addSystemMsg(data.message||'');
+    else if (data.type==='voice_state') setVoicePill(data.state, data.device_id);
+    else if (data.type==='unlock') unlockGate('Déverrouillé par la voix.');
   };
   ws.onclose=()=>{ setConn(false); setState('idle'); };
   ws.onerror=()=>{ addSystemMsg('Erreur de connexion. Serveur actif ?',true); setState('idle'); };
@@ -1627,6 +1660,31 @@ function setConn(on) {
   const txt=document.getElementById('connText');
   pill.className='status-pill'+(on?' connected':'');
   txt.textContent = on ? 'EN LIGNE' : 'HORS LIGNE';
+}
+
+const VOICE_STATE_LABELS = {
+  idle:      'VOIX · INACTIF',
+  wake:      'VOIX · "HEY ORION"',
+  listening: 'VOIX · ÉCOUTE',
+  thinking:  'VOIX · TRAITEMENT',
+  speaking:  'VOIX · PARLE',
+  offline:   'VOIX',
+};
+function setVoicePill(state, deviceId) {
+  const pill = document.getElementById('voicePill');
+  const txt  = document.getElementById('voiceText');
+  if (!pill || !txt) return;
+  if (state === 'offline') {
+    pill.classList.remove('online');
+    pill.dataset.state = 'idle';
+    txt.textContent = VOICE_STATE_LABELS.offline;
+    pill.title = 'Service voix Orion · hors ligne';
+    return;
+  }
+  pill.classList.add('online');
+  pill.dataset.state = state in VOICE_STATE_LABELS ? state : 'idle';
+  txt.textContent = VOICE_STATE_LABELS[state] || `VOIX · ${state.toUpperCase()}`;
+  pill.title = `Service voix · ${deviceId || 'inconnu'}`;
 }
 
 /* ═══════════════════════════════════════════════
@@ -1708,8 +1766,58 @@ document.getElementById('textInput').addEventListener('keydown', e => { if (e.ke
 ════════════════════════════════════════════════ */
 let audioLevel=0;
 
-function startAudioAnalysis() { audioLevel=0.16; }
-function stopAudioAnalysis() { audioLevel=0; }
+/* ── Analyse audio temps réel pour la sphère + détection de silence ── */
+let audioCtx = null, audioAnalyser = null, audioRafId = null, audioSourceNode = null;
+let silenceDetectStart = null, hasSpeechBeenDetected = false;
+
+function startAudioAnalysis(stream, onSilence) {
+  audioLevel = 0.16;
+  if (!stream) return;
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    audioSourceNode = audioCtx.createMediaStreamSource(stream);
+    audioAnalyser = audioCtx.createAnalyser();
+    audioAnalyser.fftSize = 256;
+    audioSourceNode.connect(audioAnalyser);
+    const buf = new Uint8Array(audioAnalyser.frequencyBinCount);
+    silenceDetectStart = null; hasSpeechBeenDetected = false;
+    const loop = () => {
+      if (!audioAnalyser) return;
+      audioAnalyser.getByteTimeDomainData(buf);
+      let max = 0;
+      for (let i = 0; i < buf.length; i++) {
+        const v = Math.abs(buf[i] - 128);
+        if (v > max) max = v;
+      }
+      // Volume relatif (0..1 environ)
+      audioLevel = Math.min(1, max / 64);
+      // Détection silence : seuil à 12 (sensible mais robuste au bruit ambiant)
+      if (max > 12) {
+        silenceDetectStart = null;
+        hasSpeechBeenDetected = true;
+      } else if (hasSpeechBeenDetected) {
+        if (silenceDetectStart === null) silenceDetectStart = performance.now();
+        else if (performance.now() - silenceDetectStart > 1400 && onSilence) {
+          onSilence();
+          return;
+        }
+      }
+      audioRafId = requestAnimationFrame(loop);
+    };
+    loop();
+  } catch (e) {
+    console.warn('[audio] Web Audio indisponible :', e);
+  }
+}
+function stopAudioAnalysis() {
+  audioLevel = 0;
+  if (audioRafId) { cancelAnimationFrame(audioRafId); audioRafId = null; }
+  try { audioSourceNode?.disconnect(); } catch(e) {}
+  try { audioAnalyser?.disconnect(); } catch(e) {}
+  try { audioCtx?.close(); } catch(e) {}
+  audioCtx = null; audioAnalyser = null; audioSourceNode = null;
+  silenceDetectStart = null; hasSpeechBeenDetected = false;
+}
 function readAudioLevel() {
   const target=isListening ? (0.36+Math.random()*0.42) : 0;
   const smoothing=isListening ? 0.26 : 0.18;
@@ -1720,59 +1828,161 @@ function readAudioLevel() {
 /* ═══════════════════════════════════════════════
    SPEECH RECOGNITION
 ════════════════════════════════════════════════ */
-let recognition=null, isListening=false;
+/* ═══════════════════════════════════════════════
+   MICRO : MediaRecorder → POST /api/transcribe (Whisper local côté serveur)
+   Remplace l'ancien SpeechRecognition (Web Speech API) qui dépendait des
+   serveurs cloud Microsoft/Google et plantait souvent en "network error".
+════════════════════════════════════════════════ */
+let isListening = false;
+let mediaRecorder = null;
+let mediaStream = null;
+let audioChunks = [];
+let recordTimeoutId = null;
+const MAX_RECORD_MS = 20000;  // garde-fou : enregistrement max 20 s
 
-function getSpeechRecognitionCtor() {
-  return window.SpeechRecognition||window.webkitSpeechRecognition||null;
+function pickAudioMime() {
+  const candidates = [
+    'audio/webm;codecs=opus',
+    'audio/webm',
+    'audio/ogg;codecs=opus',
+    'audio/mp4',
+  ];
+  for (const m of candidates) {
+    if (window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return m;
+  }
+  return '';  // navigateur choisira
 }
-function formatSpeechError(errorCode) {
-  if (!errorCode||errorCode==='aborted') return '';
-  if (errorCode==='audio-capture') return 'Aucun microphone détecté.';
-  if (errorCode==='not-allowed') return 'Accès au micro refusé. Vérifie les permissions du navigateur.';
-  if (errorCode==='service-not-allowed') return 'Reconnaissance vocale bloquée par le navigateur.';
-  if (errorCode==='network') return 'Service vocal du navigateur indisponible. Vérifie la connexion.';
-  if (errorCode==='no-speech') return 'Je n’ai rien entendu. Réessaie en parlant juste après l’activation du micro.';
-  if (errorCode==='language-not-supported') return 'Le français n’est pas supporté par la reconnaissance vocale du navigateur.';
-  return `Erreur micro : ${errorCode}.`;
-}
+
 function resetListeningUi() {
-  isListening=false;
-  if (sphereState==='listening') setState('idle');
+  isListening = false;
+  if (sphereState === 'listening') setState('idle');
   document.getElementById('micBtn').classList.remove('listening');
   stopAudioAnalysis();
+  if (recordTimeoutId) { clearTimeout(recordTimeoutId); recordTimeoutId = null; }
 }
 
-function setupSpeech() {
-  recognition=null;
-}
-function toggleMic() { (isListening||recognition) ? stopListening() : startListening(); }
-function startListening() {
-  if (recognition) return;
-  const SR=getSpeechRecognitionCtor();
-  if (!SR) { addSystemMsg('Reconnaissance vocale non supportée sur ce navigateur.',true); return; }
-  if (window.speechSynthesis?.speaking||window.speechSynthesis?.pending) window.speechSynthesis.cancel();
-  recognition=new SR();
-  recognition.lang='fr-FR'; recognition.continuous=false; recognition.interimResults=false; recognition.maxAlternatives=1;
-  recognition.onstart=()=>{ isListening=true; setState('listening'); document.getElementById('micBtn').classList.add('listening'); startAudioAnalysis(); };
-  recognition.onresult=(e)=>{
-    const transcript=(e.results?.[0]?.[0]?.transcript||'').trim();
-    resetListeningUi();
-    if (!transcript) { addSystemMsg('Je n’ai rien entendu. Réessaie.',true); return; }
-    document.getElementById('textInput').value=transcript;
-    sendMessage();
-  };
-  recognition.onerror=(e)=>{ const msg=formatSpeechError(e?.error); resetListeningUi(); if (msg) addSystemMsg(msg,true); };
-  recognition.onend=()=>{ resetListeningUi(); recognition=null; };
+function setupSpeech() { /* legacy noop, plus utilisé */ }
+
+function toggleMic() { isListening ? stopListening() : startListening(); }
+
+async function startListening() {
+  if (isListening) return;
+  if (!navigator.mediaDevices?.getUserMedia) {
+    addSystemMsg('Capture audio non supportée sur ce navigateur.', true);
+    return;
+  }
+  if (!window.MediaRecorder) {
+    addSystemMsg('MediaRecorder non supporté sur ce navigateur.', true);
+    return;
+  }
+  // Coupe le TTS en cours si l'utilisateur reprend la parole
+  if (window.speechSynthesis?.speaking || window.speechSynthesis?.pending) {
+    window.speechSynthesis.cancel();
+  }
+
   try {
-    recognition.start();
-  } catch(e) {
-    recognition=null; resetListeningUi();
-    addSystemMsg('Le micro est déjà en cours d’utilisation. Attends une seconde puis réessaie.',true);
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 16000 },
+    });
+  } catch (err) {
+    addSystemMsg('Accès micro refusé : ' + err.message, true);
+    return;
+  }
+
+  const mime = pickAudioMime();
+  try {
+    mediaRecorder = mime ? new MediaRecorder(mediaStream, { mimeType: mime })
+                         : new MediaRecorder(mediaStream);
+  } catch (err) {
+    addSystemMsg('Impossible de créer MediaRecorder : ' + err.message, true);
+    mediaStream.getTracks().forEach(t => t.stop());
+    mediaStream = null;
+    return;
+  }
+  audioChunks = [];
+
+  mediaRecorder.ondataavailable = (e) => {
+    if (e.data && e.data.size > 0) audioChunks.push(e.data);
+  };
+  mediaRecorder.onstop = async () => {
+    const blob = audioChunks.length
+      ? new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' })
+      : null;
+    audioChunks = [];
+    mediaStream?.getTracks().forEach(t => t.stop());
+    mediaStream = null;
+    mediaRecorder = null;
+    resetListeningUi();
+    if (!blob || blob.size < 500) {
+      addSystemMsg('Trop court ou silence. Réessaie.', true);
+      setState('idle');
+      return;
+    }
+    await uploadAudioForTranscription(blob);
+  };
+  mediaRecorder.onerror = (e) => {
+    console.error('[mic]', e);
+    addSystemMsg('Erreur MediaRecorder : ' + (e.error?.message || 'inconnue'), true);
+    resetListeningUi();
+  };
+
+  isListening = true;
+  setState('listening');
+  document.getElementById('micBtn').classList.add('listening');
+  // Lance l'analyse audio + détection silence (auto-stop après 1.4 s de silence)
+  startAudioAnalysis(mediaStream, () => {
+    if (mediaRecorder?.state === 'recording') mediaRecorder.stop();
+  });
+  // Garde-fou : stop forcé après 20 s
+  recordTimeoutId = setTimeout(() => {
+    if (mediaRecorder?.state === 'recording') mediaRecorder.stop();
+  }, MAX_RECORD_MS);
+  mediaRecorder.start();
+}
+
+function stopListening() {
+  if (mediaRecorder?.state === 'recording') {
+    mediaRecorder.stop();
+  } else {
+    resetListeningUi();
   }
 }
-function stopListening() {
-  resetListeningUi();
-  try { recognition?.stop(); } catch(e) {}
+
+async function uploadAudioForTranscription(blob) {
+  setState('processing');
+  const url = (document.getElementById('cfgUrl').value.trim().replace(/^ws/, 'http'))
+              + '/api/transcribe?token='
+              + encodeURIComponent(document.getElementById('cfgToken').value.trim())
+              + '&language=fr';
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': blob.type || 'audio/webm' },
+      body: blob,
+    });
+    if (!resp.ok) {
+      addSystemMsg('Transcription : HTTP ' + resp.status, true);
+      setState('idle');
+      return;
+    }
+    const data = await resp.json();
+    if (!data.success) {
+      addSystemMsg('Transcription : ' + (data.error || 'erreur'), true);
+      setState('idle');
+      return;
+    }
+    const text = (data.text || '').trim();
+    if (!text) {
+      addSystemMsg("Je n'ai rien compris. Réessaie en parlant plus distinctement.", true);
+      setState('idle');
+      return;
+    }
+    document.getElementById('textInput').value = text;
+    sendMessage();
+  } catch (err) {
+    addSystemMsg('Échec transcription : ' + err.message, true);
+    setState('idle');
+  }
 }
 
 /* ═══════════════════════════════════════════════

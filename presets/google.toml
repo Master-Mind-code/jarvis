@@ -1,0 +1,19 @@
+name = "google"
+description = "Active les tools Gmail + Google Calendar (en plus du serveur standard)"
+
+[env]
+ORION_PROVIDER = "anthropic"
+ORION_GOOGLE_CREDENTIALS = "data/google/credentials.json"
+ORION_GOOGLE_TOKEN = "data/google/token.json"
+
+[notes]
+required_secrets = ["ANTHROPIC_API_KEY", "ORION_SECRET_TOKEN"]
+post_setup = [
+    "Installe les deps : pip install -r requirements-google.txt",
+    "Crée un projet sur https://console.cloud.google.com/apis/credentials",
+    "Active 'Gmail API' et 'Google Calendar API' dans le projet",
+    "Crée un OAuth 2.0 Client ID type 'Desktop app'",
+    "Télécharge credentials.json → place-le dans data/google/credentials.json",
+    "Lance : python start.py server",
+    "Au 1er appel d'un tool Gmail/Calendar, un navigateur s'ouvrira pour autoriser",
+]

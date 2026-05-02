@@ -1,0 +1,17 @@
+name = "worker"
+description = "Appareil distant qui exécute des tools Orion (Termux, Pi, PC secondaire)"
+
+[env]
+ORION_AGENT_MODE = "worker"
+# À adapter : URL du serveur central que ce worker doit rejoindre
+ORION_SERVER_URL = "ws://192.168.1.42:8765"
+
+[notes]
+required_secrets = ["ORION_SECRET_TOKEN"]
+post_setup = [
+    "Installe les deps minimales : pip install -r requirements-worker.txt",
+    "Édite ORION_SERVER_URL dans .env (IP du serveur central)",
+    "Édite ORION_DEVICE_ID dans .env (ex: 'mon-telephone')",
+    "Lance : python start.py worker",
+    "Le worker apparaîtra dans la liste des appareils connectés du serveur",
+]

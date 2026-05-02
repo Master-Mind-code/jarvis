@@ -1,0 +1,14 @@
+# Mémoire long terme vectorielle (RAG) pour Orion.
+# Installe avec : pip install -r requirements-rag.txt
+#
+# Tools concernés : memory_remember, memory_recall, memory_forget, memory_clear,
+#                   memory_stats, memory_list, memory_index_file, memory_index_dir
+#
+# Premier run : ~118 MB de modèle multilingue téléchargés depuis HuggingFace
+# (~/.cache/huggingface/). Inférence CPU acceptable (~50ms/embed sur i7).
+#
+# Note : torch est tiré comme dépendance par sentence-transformers (~700 MB Windows CPU).
+sentence-transformers>=3.0.0
+numpy>=1.24.0
+# pypdf et python-docx déjà dans requirements-extras.txt — utilisés aussi pour
+# memory_index_file s'ils sont disponibles

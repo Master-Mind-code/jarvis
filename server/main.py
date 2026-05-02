@@ -14,7 +14,7 @@ import json
 import uuid
 import asyncio
 from pathlib import Path
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Depends
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -53,6 +53,26 @@ security = HTTPBearer()
 controllers: dict = {}
 # Workers connectés : {device_id: {"ws": WebSocket, "info": {os: ..., ...}, "pending": {req_id: Future}}}
 workers: dict = {}
+# État du service voix (broadcast aux UI quand un service voice est actif)
+# {device_id: {"state": "idle|wake|listening|thinking|speaking", "ts": <epoch>}}
+voice_states: dict = {}
+
+
+async def broadcast_voice_state(payload: dict, exclude_device: str | None = None):
+    """Envoie l'état voix à tous les controllers UI (sauf l'émetteur lui-même)."""
+    dead = []
+    for did, session in controllers.items():
+        if did == exclude_device:
+            continue
+        ws = session.get("ws")
+        if ws is None:
+            continue
+        try:
+            await ws.send_json(payload)
+        except Exception:
+            dead.append(did)
+    for did in dead:
+        controllers[did]["ws"] = None
 
 
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
@@ -93,6 +113,7 @@ def status():
         "status": ONLINE_STATUS,
         "controllers": list(controllers.keys()),
         "workers": [{"id": did, **w["info"]} for did, w in workers.items()],
+        "voice": voice_states,
     }
 
 
@@ -102,6 +123,51 @@ def list_devices_http(token: str = Depends(verify_token)):
         "controllers": [{"id": did, "history_len": len(s["history"])} for did, s in controllers.items()],
         "workers": [{"id": did, **w["info"]} for did, w in workers.items()],
     }
+
+
+@app.post("/api/transcribe")
+async def api_transcribe(request: Request, token: str | None = None, language: str | None = None):
+    """Transcription Whisper d'un blob audio brut (POST raw body).
+
+    Le client envoie le blob audio dans le body de la requête avec
+    Content-Type: audio/webm (ou audio/wav, audio/ogg…). Évite multipart pour
+    ne pas dépendre de python-multipart côté serveur.
+
+    Auth : ?token=... en query string (cohérent avec /ws/...).
+    """
+    if token != SECRET_TOKEN:
+        raise HTTPException(status_code=401, detail="Token invalide")
+
+    blob = await request.body()
+    if not blob:
+        return JSONResponse({"success": False, "error": "Audio vide"}, status_code=400)
+
+    # Devine le suffix d'après le Content-Type (utile à faster-whisper/ffmpeg)
+    content_type = (request.headers.get("content-type") or "").lower()
+    if "webm" in content_type:
+        suffix = ".webm"
+    elif "wav" in content_type:
+        suffix = ".wav"
+    elif "ogg" in content_type or "opus" in content_type:
+        suffix = ".ogg"
+    elif "mp3" in content_type or "mpeg" in content_type:
+        suffix = ".mp3"
+    elif "mp4" in content_type or "m4a" in content_type:
+        suffix = ".m4a"
+    else:
+        suffix = ".webm"
+
+    try:
+        from server.transcribe import transcribe_blob
+        text = await asyncio.to_thread(transcribe_blob, blob, language, suffix)
+    except ImportError as exc:
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=503)
+    except Exception as exc:
+        return JSONResponse(
+            {"success": False, "error": f"{type(exc).__name__}: {exc}"},
+            status_code=500,
+        )
+    return {"success": True, "text": text, "language": language or "fr"}
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -223,6 +289,13 @@ async def controller_endpoint(websocket: WebSocket, device_id: str):
     print(f"[controller +] {device_id} connecté")
     try:
         await websocket.send_json({"type": "connected", "device_id": device_id, "message": "Orion en ligne ✓"})
+        # Resync : envoie au nouveau client l'état actuel des services voix actifs
+        for did, info in voice_states.items():
+            await websocket.send_json({
+                "type": "voice_state",
+                "device_id": did,
+                "state": info.get("state", "idle"),
+            })
     except (WebSocketDisconnect, RuntimeError):
         # Le client s'est déconnecté avant qu'on envoie le welcome (typique mobile)
         print(f"[controller -] {device_id} (déconnecté avant welcome)")
@@ -267,6 +340,7 @@ async def controller_endpoint(websocket: WebSocket, device_id: str):
                             on_tool_call=on_tool,
                             dispatcher=dispatcher,
                             list_devices=list_workers_info,
+                            device_id=device_id,
                         ),
                     )
                     await websocket.send_json({"type": "response", "content": response})
@@ -281,6 +355,26 @@ async def controller_endpoint(websocket: WebSocket, device_id: str):
                 session["history"] = []
                 await websocket.send_json({"type": "info", "message": "Historique effacé."})
 
+            elif msg_type == "voice_state":
+                # Le service voix annonce son état (idle/wake/listening/thinking/speaking).
+                # On le stocke et on le broadcast aux autres UI pour visualisation.
+                state = data.get("state", "idle")
+                voice_states[device_id] = {"state": state, "ts": asyncio.get_event_loop().time()}
+                await broadcast_voice_state(
+                    {"type": "voice_state", "device_id": device_id, "state": state},
+                    exclude_device=device_id,
+                )
+
+            elif msg_type == "unlock_request":
+                # Demande de déverrouillage du password gate des UI navigateur.
+                # Émise par le service voix quand l'utilisateur prononce un mot d'unlock.
+                # On broadcast à tous les autres clients (les UI réagissent).
+                print(f"[unlock] demandé par {device_id}")
+                await broadcast_voice_state(
+                    {"type": "unlock", "from": device_id},
+                    exclude_device=device_id,
+                )
+
             elif msg_type == "ping":
                 await websocket.send_json({"type": "pong"})
 
@@ -288,6 +382,13 @@ async def controller_endpoint(websocket: WebSocket, device_id: str):
         print(f"[controller -] {device_id} déconnecté")
         if device_id in controllers:
             controllers[device_id]["ws"] = None
+        # Si c'était un service voix, on retire son état et on notifie les UI
+        if device_id in voice_states:
+            voice_states.pop(device_id, None)
+            await broadcast_voice_state(
+                {"type": "voice_state", "device_id": device_id, "state": "offline"},
+                exclude_device=device_id,
+            )
 
 
 if __name__ == "__main__":

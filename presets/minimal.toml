@@ -1,0 +1,16 @@
+name = "minimal"
+description = "Setup minimal — chat uniquement, pas de trading ni de voix"
+
+[env]
+ORION_PROVIDER = "gemini"
+ORION_GEMINI_MODEL = "gemini-2.0-flash"
+SERVER_HOST = "127.0.0.1"
+SERVER_PORT = "8765"
+
+[notes]
+required_secrets = ["GEMINI_API_KEY", "ORION_SECRET_TOKEN"]
+post_setup = [
+    "Récupère une clé Gemini gratuite sur https://aistudio.google.com/apikey",
+    "Lance : python start.py server",
+    "Ouvre http://localhost:8765",
+]

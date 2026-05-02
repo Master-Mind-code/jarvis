@@ -1,0 +1,11 @@
+# Stack voix locale d'Orion (STT + VAD + TTS + audio I/O)
+# Tous compatibles Windows/Linux/macOS via wheels prebuilt.
+# Inspiré de : github.com/Reezxy/Jarvis---Local-Voice-assistant
+faster-whisper>=1.0.0
+kokoro-onnx>=0.4.0
+sounddevice>=0.4.6
+webrtcvad-wheels>=2.0.14
+numpy>=1.24.0
+huggingface_hub>=0.25.0
+websockets>=13.0
+python-dotenv>=1.0.0
