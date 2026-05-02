@@ -1,5 +1,5 @@
 """
-Jarvis — Serveur Central WebSocket
+Orion — Serveur Central WebSocket
 
 Deux types de connexions :
   - Controller (chat client) : /ws/{device_id} → envoie des messages, reçoit des réponses.
@@ -18,21 +18,34 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Depe
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
+from branding import (
+    APP_NAME,
+    DEFAULT_SECRET_TOKEN,
+    LEGACY_UI_FILE_NAME,
+    ONLINE_STATUS,
+    TRADING_UI_FILE_NAME,
+    get_env,
+    resolve_ui_file,
+    sync_env_aliases,
+)
 from server.orchestrator import process_request
 from server.trading.routes import router as trading_router
 
 load_dotenv()
+sync_env_aliases()
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
-UI_FILE = ROOT_DIR / "jarvis_ui.html"
-TRADING_UI_FILE = ROOT_DIR / "trading_dashboard.html"
+TRADING_UI_FILE = ROOT_DIR / TRADING_UI_FILE_NAME
+ASSETS_DIR = ROOT_DIR / "assets"
 
-SECRET_TOKEN = os.getenv("JARVIS_SECRET_TOKEN", "jarvis_secret_change_me")
-RPC_TIMEOUT = float(os.getenv("JARVIS_RPC_TIMEOUT", "60"))
+SECRET_TOKEN = get_env("SECRET_TOKEN", DEFAULT_SECRET_TOKEN)
+RPC_TIMEOUT = float(get_env("RPC_TIMEOUT", "60"))
 
-app = FastAPI(title="Jarvis Server", version="2.0.0")
+app = FastAPI(title=f"{APP_NAME} Server", version="2.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.mount("/assets", StaticFiles(directory=ASSETS_DIR, check_dir=False), name="assets")
 app.include_router(trading_router)
 security = HTTPBearer()
 
@@ -49,11 +62,14 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
 
 
 @app.get("/")
+@app.get("/orion_ui.html")
+@app.get(f"/{LEGACY_UI_FILE_NAME}", include_in_schema=False)
 def serve_ui():
-    """Sert l'UI Jarvis directement. Accessible depuis n'importe quel navigateur."""
-    if UI_FILE.exists():
-        return FileResponse(UI_FILE, media_type="text/html")
-    return JSONResponse({"error": "jarvis_ui.html introuvable à la racine du projet"}, status_code=404)
+    """Sert l'UI Orion directement. Accessible depuis n'importe quel navigateur."""
+    ui_file = resolve_ui_file(ROOT_DIR)
+    if ui_file.exists():
+        return FileResponse(ui_file, media_type="text/html")
+    return JSONResponse({"error": f"{ui_file.name} introuvable à la racine du projet"}, status_code=404)
 
 
 @app.get("/trading")
@@ -74,7 +90,7 @@ def serve_trading_ui():
 @app.get("/status")
 def status():
     return {
-        "status": "Jarvis online",
+        "status": ONLINE_STATUS,
         "controllers": list(controllers.keys()),
         "workers": [{"id": did, **w["info"]} for did, w in workers.items()],
     }
@@ -206,7 +222,7 @@ async def controller_endpoint(websocket: WebSocket, device_id: str):
 
     print(f"[controller +] {device_id} connecté")
     try:
-        await websocket.send_json({"type": "connected", "device_id": device_id, "message": "Jarvis en ligne ✓"})
+        await websocket.send_json({"type": "connected", "device_id": device_id, "message": "Orion en ligne ✓"})
     except (WebSocketDisconnect, RuntimeError):
         # Le client s'est déconnecté avant qu'on envoie le welcome (typique mobile)
         print(f"[controller -] {device_id} (déconnecté avant welcome)")
@@ -278,5 +294,5 @@ if __name__ == "__main__":
     import uvicorn
     host = os.getenv("SERVER_HOST", "0.0.0.0")
     port = int(os.getenv("SERVER_PORT", "8765"))
-    print(f"Jarvis Server démarré sur ws://{host}:{port}")
+    print(f"Orion Server démarré sur ws://{host}:{port}")
     uvicorn.run(app, host=host, port=port)

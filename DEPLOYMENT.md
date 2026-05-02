@@ -1,6 +1,6 @@
-# 📡 Guide de déploiement Jarvis
+# 📡 Guide de déploiement Orion
 
-Guide complet pour publier Jarvis sur GitHub et déployer un worker sur d'autres appareils (PC, téléphone Android, Raspberry Pi, etc.).
+Guide complet pour publier Orion sur GitHub et déployer un worker sur d'autres appareils (PC, téléphone Android, Raspberry Pi, etc.).
 
 ---
 
@@ -8,13 +8,13 @@ Guide complet pour publier Jarvis sur GitHub et déployer un worker sur d'autres
 
 Avant tout push public ou partage de fichiers :
 
-1. **Régénère un token serveur fort** (`JARVIS_SECRET_TOKEN` dans `.env`) :
+1. **Régénère un token serveur fort** (`ORION_SECRET_TOKEN` dans `.env`) :
 
     ```bash
     python -c "import secrets; print(secrets.token_hex(32))"
     ```
 
-    Copie le résultat dans `.env` ligne `JARVIS_SECRET_TOKEN=...`.
+    Copie le résultat dans `.env` ligne `ORION_SECRET_TOKEN=...`.
 
 2. **Vérifie que `.gitignore` couvre `.env`** :
 
@@ -33,13 +33,13 @@ Avant tout push public ou partage de fichiers :
 ### Option A — via le navigateur
 
 1. Va sur <https://github.com/new>
-2. **Repository name** : `jarvis`
+2. **Repository name** : `orion`
 3. **Privé** ✅ (recommandé)
 4. **Ne coche aucune case** (README/.gitignore/license sont déjà dans le repo local)
 5. Crée le repo, puis dans ton terminal local :
 
     ```bash
-    git remote add origin https://github.com/<TON_USERNAME>/jarvis.git
+    git remote add origin https://github.com/<TON_USERNAME>/orion.git
     git push -u origin main
     ```
 
@@ -50,7 +50,7 @@ GitHub demandera ton authentification. Si tu n'as pas de Personal Access Token :
 ```bash
 # Une fois : https://cli.github.com
 gh auth login
-gh repo create jarvis --private --source=. --remote=origin --push
+gh repo create orion --private --source=. --remote=origin --push
 ```
 
 ### Vérification post-push
@@ -77,12 +77,12 @@ pkg install -y python git rust openssl libffi clang
 termux-setup-storage   # optionnel, donne accès au stockage du téléphone
 ```
 
-### Cloner Jarvis
+### Cloner Orion
 
 ```bash
 cd ~
-git clone https://github.com/<TON_USERNAME>/jarvis.git
-cd jarvis
+git clone https://github.com/<TON_USERNAME>/orion.git
+cd orion
 ```
 
 ### Installer les dépendances minimales
@@ -105,10 +105,10 @@ nano .env
 Renseigne uniquement les variables nécessaires :
 
 ```bash
-JARVIS_SECRET_TOKEN=<le_meme_token_que_le_serveur_PC>
-JARVIS_SERVER_URL=ws://<IP_DU_PC>:8765
-JARVIS_DEVICE_ID=telephone-dominique
-JARVIS_AGENT_MODE=worker
+ORION_SECRET_TOKEN=<le_meme_token_que_le_serveur_PC>
+ORION_SERVER_URL=ws://<IP_DU_PC>:8765
+ORION_DEVICE_ID=telephone-dominique
+ORION_AGENT_MODE=worker
 ```
 
 (Pas besoin de `ANTHROPIC_API_KEY` ni `GEMINI_API_KEY` ici — le cerveau reste sur le PC.)
@@ -136,7 +136,7 @@ Termux s'endort quand l'écran s'éteint. Pour maintenir le worker :
 termux-wake-lock
 
 # Lance en arrière-plan, redirige les logs
-nohup python start.py worker > jarvis.log 2>&1 &
+nohup python start.py worker > orion.log 2>&1 &
 ```
 
 Pour arrêter :
@@ -146,7 +146,7 @@ pkill -f "agent.py"
 termux-wake-unlock
 ```
 
-Pour voir les logs en direct : `tail -f jarvis.log`.
+Pour voir les logs en direct : `tail -f orion.log`.
 
 ---
 
@@ -154,10 +154,10 @@ Pour voir les logs en direct : `tail -f jarvis.log`.
 
 **Pas de support direct** : iOS interdit l'exécution de Python en arrière-plan.
 
-**Alternative pratique** : utilise simplement **Safari sur l'IP du PC** pour parler à Jarvis comme un client de chat :
+**Alternative pratique** : utilise simplement **Safari sur l'IP du PC** pour parler à Orion comme un client de chat :
 
 ```text
-http://<IP_DU_PC>:8765/jarvis_ui.html
+http://<IP_DU_PC>:8765/orion_ui.html
 ```
 
 (Si tu veux que l'iPhone exécute des tools localement, il faut une app native iOS — hors-périmètre de ce projet.)
@@ -167,8 +167,8 @@ http://<IP_DU_PC>:8765/jarvis_ui.html
 ## 🐧 4. Linux / macOS / Raspberry Pi
 
 ```bash
-git clone https://github.com/<TON_USERNAME>/jarvis.git
-cd jarvis
+git clone https://github.com/<TON_USERNAME>/orion.git
+cd orion
 
 # Choix : full ou worker-only
 pip install -r requirements-worker.txt    # léger (recommandé pour Pi)
@@ -177,7 +177,7 @@ pip install -r requirements.txt            # complet (serveur + LLM)
 
 cp .env.example .env
 nano .env
-# configure JARVIS_SERVER_URL, JARVIS_SECRET_TOKEN, JARVIS_DEVICE_ID
+# configure ORION_SERVER_URL, ORION_SECRET_TOKEN, ORION_DEVICE_ID
 
 ./start.sh worker
 ```
@@ -187,21 +187,21 @@ nano .env
 Crée le service :
 
 ```bash
-sudo nano /etc/systemd/system/jarvis-worker.service
+sudo nano /etc/systemd/system/orion-worker.service
 ```
 
 Contenu :
 
 ```ini
 [Unit]
-Description=Jarvis Worker
+Description=Orion Worker
 After=network.target
 
 [Service]
 Type=simple
 User=pi
-WorkingDirectory=/home/pi/jarvis
-ExecStart=/usr/bin/python3 /home/pi/jarvis/start.py worker
+WorkingDirectory=/home/pi/orion
+ExecStart=/usr/bin/python3 /home/pi/orion/start.py worker
 Restart=always
 RestartSec=5
 
@@ -213,40 +213,47 @@ Active et démarre :
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable --now jarvis-worker
-sudo systemctl status jarvis-worker
+sudo systemctl enable --now orion-worker
+sudo systemctl status orion-worker
 ```
 
-Logs en direct : `journalctl -u jarvis-worker -f`.
+Logs en direct : `journalctl -u orion-worker -f`.
 
 ---
 
 ## 💻 5. Windows (autre PC)
 
 ```powershell
-git clone https://github.com/<TON_USERNAME>/jarvis.git
-cd jarvis
+git clone https://github.com/<TON_USERNAME>/orion.git
+cd orion
 pip install -r requirements.txt
 copy .env.example .env
 notepad .env
 
-# Configure JARVIS_SERVER_URL, JARVIS_SECRET_TOKEN, JARVIS_DEVICE_ID
+# Configure ORION_SERVER_URL, ORION_SECRET_TOKEN, ORION_DEVICE_ID
 
 .\start.bat worker
 ```
 
 ### Démarrage automatique
 
-Place un raccourci de `start.bat worker` dans `shell:startup` :
+Active-le directement depuis le projet :
 
-1. Win+R → tape `shell:startup` → Enter
-2. Crée un raccourci vers `start.bat` avec l'argument `worker`
+```powershell
+python start.py install-startup worker
+```
+
+Cela crée un lanceur caché dans le dossier `Startup` de Windows. Pour le retirer :
+
+```powershell
+python start.py remove-startup
+```
 
 ---
 
 ## 🌐 6. Accès depuis l'extérieur (Tailscale)
 
-Sur le réseau local (Wi-Fi, Ethernet) ça marche déjà. Pour utiliser Jarvis depuis le bureau, le métro, etc. :
+Sur le réseau local (Wi-Fi, Ethernet) ça marche déjà. Pour utiliser Orion depuis le bureau, le métro, etc. :
 
 1. Crée un compte gratuit sur <https://tailscale.com>
 2. Installe Tailscale sur **chaque appareil** :
@@ -264,7 +271,7 @@ Sur le réseau local (Wi-Fi, Ethernet) ça marche déjà. Pour utiliser Jarvis d
 5. Sur chaque worker, dans `.env` :
 
     ```bash
-    JARVIS_SERVER_URL=ws://100.64.1.23:8765
+    ORION_SERVER_URL=ws://100.64.1.23:8765
     ```
 
 Plus besoin de port-forwarding ni d'IP publique. Le trafic passe dans un tunnel WireGuard chiffré bout-en-bout.
@@ -318,7 +325,7 @@ Le LLM appelle `get_system_info` avec `target_device="telephone-dominique"` → 
 
 | Symptôme | Cause probable | Fix |
 |---|---|---|
-| `connection rejected (403 Forbidden)` | Tokens différents entre client et serveur | Aligne `JARVIS_SECRET_TOKEN` partout |
+| `connection rejected (403 Forbidden)` | Tokens différents entre client et serveur | Aligne `ORION_SECRET_TOKEN` partout |
 | `ModuleNotFoundError: server` | Lancé depuis un mauvais dossier | `cd` dans la racine du projet, ou utilise `start.py` |
 | `RESOURCE_EXHAUSTED` (Gemini) | Quota gratuit absent ou épuisé | Recrée la clé via <https://aistudio.google.com/apikey> |
 | `credit balance is too low` (Anthropic) | Compte sans crédit | Recharge sur <https://console.anthropic.com/settings/billing> |

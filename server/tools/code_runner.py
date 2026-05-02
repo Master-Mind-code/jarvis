@@ -1,5 +1,5 @@
 """
-Jarvis Tool — Code Runner & Shell Executor
+Orion Tool — Code Runner & Shell Executor
 Exécuter des commandes shell et des scripts Python.
 """
 import subprocess

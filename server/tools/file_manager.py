@@ -1,5 +1,5 @@
 """
-Jarvis Tool — File Manager
+Orion Tool — File Manager
 Créer, lire, modifier, supprimer des fichiers et dossiers.
 """
 import os

@@ -1,13 +1,20 @@
 """
-Jarvis Trading — Routes API
+Orion Trading — Routes API
 Endpoints HTTP pour l'EA MT5 + WebSocket pour le dashboard.
 """
 import os
 import json
 import asyncio
 from datetime import datetime
-from fastapi import APIRouter, Request, Header, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Request, Header, HTTPException, WebSocket, WebSocketDisconnect, Depends
 from fastapi.responses import JSONResponse
+from branding import (
+    DEFAULT_SECRET_TOKEN,
+    LEGACY_TRADING_TOKEN_HEADER,
+    TRADING_TOKEN_HEADER,
+    get_env,
+    sync_env_aliases,
+)
 
 from server.trading.analyzer import analyze_market, should_execute
 from server.trading.trade_manager import (
@@ -17,11 +24,12 @@ from server.trading.trade_manager import (
 )
 
 router = APIRouter(prefix="/api")
-SECRET = os.getenv("JARVIS_SECRET_TOKEN", "jarvis_secret_change_me")
+sync_env_aliases()
+SECRET = get_env("SECRET_TOKEN", DEFAULT_SECRET_TOKEN)
 
 # Délai minimum entre deux analyses Claude (économise les tokens API)
-# Override possible via env JARVIS_TRADER_MIN_INTERVAL.
-ANALYSIS_MIN_INTERVAL = float(os.getenv("JARVIS_TRADER_MIN_INTERVAL", "60"))
+# Override possible via env ORION_TRADER_MIN_INTERVAL.
+ANALYSIS_MIN_INTERVAL = float(get_env("TRADER_MIN_INTERVAL", "60"))
 
 # WebSocket clients du dashboard
 dashboard_clients: list = []
@@ -38,19 +46,26 @@ def check_token(token: str):
         raise HTTPException(status_code=401, detail="Token invalide")
 
 
+def trading_token(
+    x_orion_token: str = Header(default="", alias=TRADING_TOKEN_HEADER),
+    x_legacy_token: str = Header(default="", alias=LEGACY_TRADING_TOKEN_HEADER),
+):
+    return x_orion_token or x_legacy_token
+
+
 # ─────────────────────────────────────────────────────────────────
-# EA → Jarvis : réception des données marché
+# EA → Orion : réception des données marché
 # ─────────────────────────────────────────────────────────────────
 @router.post("/market-data")
-async def receive_market_data(request: Request, x_jarvis_token: str = Header(default="")):
-    check_token(x_jarvis_token)
+async def receive_market_data(request: Request, token: str = Depends(trading_token)):
+    check_token(token)
 
     raw_body = await request.body()
     try:
         market_data = json.loads(raw_body)
     except Exception as e:
         snippet = raw_body[:400].decode("utf-8", errors="replace")
-        print(f"[JARVIS TRADING] /market-data JSON invalide: {e} | body[:400]={snippet!r}")
+        print(f"[ORION TRADING] /market-data JSON invalide: {e} | body[:400]={snippet!r}")
         raise HTTPException(status_code=400, detail=f"JSON invalide: {e}")
 
     positions = market_data.get("open_positions", [])
@@ -112,7 +127,7 @@ async def run_analysis(market_data: dict, state: dict):
                 "entry":  decision.get("entry"),
                 "sl":     decision.get("sl"),
                 "tp":     decision.get("tp1"),
-                "comment": f"JARVIS|{decision.get('strategy','')}|{decision.get('confidence',0)}%",
+                "comment": f"ORION|{decision.get('strategy','')}|{decision.get('confidence',0)}%",
             }
             push_command(cmd)
             await broadcast_dashboard({
@@ -121,25 +136,25 @@ async def run_analysis(market_data: dict, state: dict):
             })
 
     except Exception as e:
-        print(f"[JARVIS TRADING] Erreur analyse: {e}")
+        print(f"[ORION TRADING] Erreur analyse: {e}")
 
 
 # ─────────────────────────────────────────────────────────────────
-# EA → Jarvis : polling des commandes
+# EA → Orion : polling des commandes
 # ─────────────────────────────────────────────────────────────────
 @router.get("/trade-command")
-async def get_trade_command(magic: int = 0, x_jarvis_token: str = Header(default="")):
-    check_token(x_jarvis_token)
+async def get_trade_command(magic: int = 0, token: str = Depends(trading_token)):
+    check_token(token)
     cmd = pop_command(magic)
     return JSONResponse(content=cmd)
 
 
 # ─────────────────────────────────────────────────────────────────
-# EA → Jarvis : confirmation d'exécution
+# EA → Orion : confirmation d'exécution
 # ─────────────────────────────────────────────────────────────────
 @router.post("/trade-confirm")
-async def trade_confirm(request: Request, x_jarvis_token: str = Header(default="")):
-    check_token(x_jarvis_token)
+async def trade_confirm(request: Request, token: str = Depends(trading_token)):
+    check_token(token)
     data = await request.json()
 
     if data.get("executed"):
@@ -153,11 +168,11 @@ async def trade_confirm(request: Request, x_jarvis_token: str = Header(default="
 
 
 # ─────────────────────────────────────────────────────────────────
-# Dashboard → Jarvis : contrôle du système
+# Dashboard → Orion : contrôle du système
 # ─────────────────────────────────────────────────────────────────
 @router.post("/trading/start")
-async def start_trading(request: Request, x_jarvis_token: str = Header(default="")):
-    check_token(x_jarvis_token)
+async def start_trading(request: Request, token: str = Depends(trading_token)):
+    check_token(token)
     body = await request.json()
     state = set_trading_state({
         "active": True,
@@ -171,24 +186,24 @@ async def start_trading(request: Request, x_jarvis_token: str = Header(default="
 
 
 @router.post("/trading/stop")
-async def stop_trading(x_jarvis_token: str = Header(default="")):
-    check_token(x_jarvis_token)
+async def stop_trading(token: str = Depends(trading_token)):
+    check_token(token)
     state = set_trading_state({"active": False})
     await broadcast_dashboard({"type": "system_status", "data": state})
     return {"status": "stopped", "state": state}
 
 
 @router.post("/trading/close-all")
-async def close_all(x_jarvis_token: str = Header(default="")):
-    check_token(x_jarvis_token)
+async def close_all(token: str = Depends(trading_token)):
+    check_token(token)
     push_command({"action": "CLOSE_ALL"})
     await broadcast_dashboard({"type": "close_all_requested"})
     return {"status": "close_all_queued"}
 
 
 @router.post("/trading/manual-trade")
-async def manual_trade(request: Request, x_jarvis_token: str = Header(default="")):
-    check_token(x_jarvis_token)
+async def manual_trade(request: Request, token: str = Depends(trading_token)):
+    check_token(token)
     cmd = await request.json()
     push_command(cmd)
     return {"status": "queued", "command": cmd}
@@ -198,8 +213,8 @@ async def manual_trade(request: Request, x_jarvis_token: str = Header(default=""
 # Dashboard : données
 # ─────────────────────────────────────────────────────────────────
 @router.get("/trading/stats")
-async def get_stats(x_jarvis_token: str = Header(default="")):
-    check_token(x_jarvis_token)
+async def get_stats(token: str = Depends(trading_token)):
+    check_token(token)
     return {
         "stats": compute_stats(),
         "open_trades": get_open_trades(),

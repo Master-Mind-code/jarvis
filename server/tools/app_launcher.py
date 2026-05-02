@@ -1,5 +1,5 @@
 """
-Jarvis Tool — App Launcher
+Orion Tool — App Launcher
 Ouvre des applications et logiciels selon l'OS.
 Android (Termux) supporté via `monkey` / `am start` / `pm list packages`.
 """

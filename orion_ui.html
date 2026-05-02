@@ -4,7 +4,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>JARVIS</title>
+<title>ORION</title>
+<link rel="icon" href="assets/orion-mark.svg" type="image/svg+xml">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Space+Grotesk:wght@300;400;500&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
 <style>
 /* ══════════════════════════════════════════════
@@ -123,15 +124,35 @@ header {
 }
 
 .logo {
-  font-family: 'Orbitron', monospace;
-  font-weight: 900;
-  font-size: 20px;
-  letter-spacing: 10px;
-  color: var(--cyan);
-  text-shadow: 0 0 24px var(--cyan-glow), 0 0 60px rgba(0,229,255,0.15);
+  display: flex;
+  align-items: center;
+  gap: 12px;
   user-select: none;
 }
-.logo em { color: rgba(255,255,255,0.9); font-style: normal; }
+.logo-mark {
+  width: 34px;
+  height: 34px;
+  display: block;
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 12px rgba(0,229,255,0.35));
+}
+.logo-word {
+  display: flex;
+  flex-direction: column;
+  font-family: 'Orbitron', monospace;
+  font-weight: 900;
+  font-size: 18px;
+  letter-spacing: 6px;
+  line-height: 1;
+  color: var(--cyan);
+  text-shadow: 0 0 24px var(--cyan-glow), 0 0 60px rgba(0,229,255,0.15);
+}
+.logo-word span {
+  margin-top: 4px;
+  font-size: 7px;
+  letter-spacing: 3.5px;
+  color: var(--text-dim);
+}
 
 .header-right {
   display: flex;
@@ -462,10 +483,14 @@ header {
   margin-top: 4px;
   letter-spacing: 0;
 }
-.msg.jarvis .msg-avatar {
+.msg.orion .msg-avatar {
   background: rgba(0,229,255,0.06);
   border: 1px solid rgba(0,229,255,0.2);
-  color: var(--cyan);
+  background-image: url('assets/orion-mark.svg');
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 22px 22px;
+  color: transparent;
 }
 .msg.user .msg-avatar {
   background: rgba(123,94,167,0.12);
@@ -487,7 +512,7 @@ header {
   letter-spacing: 2.5px;
   text-transform: uppercase;
 }
-.msg.jarvis .msg-sender { color: rgba(0,229,255,0.45); }
+.msg.orion .msg-sender { color: rgba(0,229,255,0.45); }
 .msg.user  .msg-sender  { color: rgba(123,94,167,0.6); }
 
 .msg-text {
@@ -501,7 +526,7 @@ header {
   position: relative;
 }
 
-.msg.jarvis .msg-text {
+.msg.orion .msg-text {
   background: rgba(5,12,28,0.7);
   border: 1px solid var(--border);
   border-left: 1.5px solid var(--cyan);
@@ -806,20 +831,29 @@ header {
 }
 
 .pwd-logo {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 6px;
+}
+.pwd-logo-mark {
+  width: 152px;
+  display: block;
+  filter: drop-shadow(0 0 20px rgba(0,229,255,0.32));
+}
+.pwd-logo-word {
   font-family: 'Orbitron', monospace;
   font-weight: 900;
   font-size: 36px;
-  letter-spacing: 14px;
+  letter-spacing: 12px;
   color: var(--cyan);
   text-shadow: 0 0 30px var(--cyan-glow), 0 0 80px rgba(0,229,255,0.12);
-  margin-bottom: 6px;
   position: relative;
-  display: inline-block;
 }
-.pwd-logo em { color: rgba(255,255,255,0.92); font-style: normal; }
 
 /* Scan animation sur logo */
-.pwd-logo::after {
+.pwd-logo-word::after {
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0;
@@ -942,7 +976,10 @@ header {
   <div class="gate-grid"></div>
   <div class="pwd-box hud-frame">
     <div class="corner-br"></div><div class="corner-bl"></div>
-    <div class="pwd-logo">JAR<em>VIS</em></div>
+    <div class="pwd-logo">
+      <img class="pwd-logo-mark" src="assets/orion-mark.svg" alt="Logo Orion">
+      <div class="pwd-logo-word">ORION</div>
+    </div>
     <div class="pwd-sub">Système d'IA personnel — Authentification requise</div>
     <div class="pwd-divider"></div>
     <input type="password" id="pwdInput" placeholder="· · · · · ·" autocomplete="off"/>
@@ -958,7 +995,10 @@ header {
      HEADER
 ════════════════════════════════════════════════ -->
 <header>
-  <div class="logo">JAR<em>VIS</em></div>
+  <div class="logo">
+    <img class="logo-mark" src="assets/orion-mark.svg" alt="Logo Orion">
+    <div class="logo-word">ORION<span>PERSONAL AI</span></div>
+  </div>
   <div class="header-right">
     <div class="live-clock" id="liveClock">--:--:--</div>
     <div class="state-label" id="stateLabel">STANDBY</div>
@@ -1042,11 +1082,11 @@ header {
   <!-- Chat -->
   <div class="chat-zone">
     <div id="chat">
-      <div class="msg jarvis">
-        <div class="msg-avatar">J</div>
+      <div class="msg orion">
+        <div class="msg-avatar" aria-hidden="true"></div>
         <div class="msg-content">
-          <div class="msg-sender">JARVIS</div>
-          <div class="msg-text">Bonjour. Je suis Jarvis, ton assistant personnel. Configure le serveur dans les paramètres (⚙), puis connecte-toi. Tu peux aussi m'utiliser sans serveur si tu relances avec le mode standalone Python.</div>
+          <div class="msg-sender">ORION</div>
+          <div class="msg-text">Bonjour. Je suis Orion, ton assistant personnel. Configure le serveur dans les paramètres (⚙), puis connecte-toi. Tu peux aussi m'utiliser sans serveur si tu relances avec le mode standalone Python.</div>
         </div>
       </div>
     </div>
@@ -1061,7 +1101,7 @@ header {
         </svg>
       </button>
       <div class="input-wrap">
-        <input type="text" id="textInput" placeholder="Parle à Jarvis…" autocomplete="off"/>
+        <input type="text" id="textInput" placeholder="Parle à Orion…" autocomplete="off"/>
       </div>
       <button class="btn-action" id="sendBtn" title="Envoyer" onclick="sendMessage()">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7">
@@ -1236,7 +1276,7 @@ const SHAPE_LABELS = {
   atom:'ATOME', hub:'HUB NEURONAL', tore:'TORE', face:'VISAGE IA',
   letterD:'LETTRE D', dominique:'DOMINIQUE'
 };
-const TEXTS = ['DOMINIQUE','JARVIS'];
+const TEXTS = ['DOMINIQUE','ORION'];
 let shapeIdx = 0, textCycle = 0;
 let faceEyePositions = null;
 
@@ -1567,11 +1607,11 @@ function connect() {
   const fullUrl=`${url}/ws/${device}?token=${token}`;
   if (ws) ws.close();
   ws=new WebSocket(fullUrl);
-  ws.onopen=()=>{ setConn(true); addSystemMsg('Connexion établie. Jarvis est prêt.'); toggleConfig(); };
+  ws.onopen=()=>{ setConn(true); addSystemMsg('Connexion établie. Orion est prêt.'); toggleConfig(); };
   ws.onmessage=(evt)=>{
     const data=JSON.parse(evt.data);
     if (data.type==='tool_action') addToolAction(data.tool,data.result?.success!==false);
-    else if (data.type==='response') { removeThinking(); setState('speaking'); addJarvisMsg(data.content); speak(data.content); setTimeout(()=>setState('idle'),200); }
+    else if (data.type==='response') { removeThinking(); setState('speaking'); addOrionMsg(data.content); speak(data.content); setTimeout(()=>setState('idle'),200); }
     else if (data.type==='connected') addSystemMsg(data.message||'Connecté');
     else if (data.type==='error') { removeThinking(); setState('idle'); addSystemMsg('Erreur : '+(data.content||'inconnue'),true); }
     else if (data.type==='info') addSystemMsg(data.message||'');
@@ -1596,18 +1636,18 @@ function addMsg(role, text) {
   const chat=document.getElementById('chat');
   const isUser=role==='user';
   const div=document.createElement('div');
-  div.className=`msg ${isUser?'user':'jarvis'}`;
+  div.className=`msg ${isUser?'user':'orion'}`;
   div.innerHTML=`
-    <div class="msg-avatar">${isUser?'VOUS':'J'}</div>
+    <div class="msg-avatar">${isUser?'VOUS':''}</div>
     <div class="msg-content">
-      <div class="msg-sender">${isUser?'VOUS':'JARVIS'}</div>
+      <div class="msg-sender">${isUser?'VOUS':'ORION'}</div>
       <div class="msg-text">${text}</div>
     </div>`;
   chat.appendChild(div);
   chat.scrollTop=chat.scrollHeight;
   return div;
 }
-function addJarvisMsg(text) { return addMsg('jarvis',text); }
+function addOrionMsg(text) { return addMsg('orion',text); }
 function addUserMsg(text)   { return addMsg('user',text); }
 
 function addSystemMsg(text, isError=false) {
@@ -1623,11 +1663,11 @@ function addSystemMsg(text, isError=false) {
 function addThinking() {
   const chat=document.getElementById('chat');
   const div=document.createElement('div');
-  div.className='msg jarvis'; div.id='thinkingMsg';
+  div.className='msg orion'; div.id='thinkingMsg';
   div.innerHTML=`
-    <div class="msg-avatar">J</div>
+    <div class="msg-avatar" aria-hidden="true"></div>
     <div class="msg-content">
-      <div class="msg-sender">JARVIS</div>
+      <div class="msg-sender">ORION</div>
       <div class="thinking">
         Traitement en cours
         <span class="thinking-dots"><span></span><span></span><span></span></span>
@@ -1666,33 +1706,14 @@ document.getElementById('textInput').addEventListener('keydown', e => { if (e.ke
 /* ═══════════════════════════════════════════════
    AUDIO ANALYSER
 ════════════════════════════════════════════════ */
-let audioCtx=null,analyser=null,audioBuffer=null,micStream=null,audioLevel=0,audioActive=false;
+let audioLevel=0;
 
-async function startAudioAnalysis() {
-  try {
-    if (!micStream) micStream=await navigator.mediaDevices.getUserMedia({audio:true});
-    if (!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
-    if (audioCtx.state==='suspended') await audioCtx.resume();
-    if (!analyser) {
-      analyser=audioCtx.createAnalyser(); analyser.fftSize=256; analyser.smoothingTimeConstant=0.6;
-      audioBuffer=new Uint8Array(analyser.frequencyBinCount);
-      audioCtx.createMediaStreamSource(micStream).connect(analyser);
-    }
-    audioActive=true;
-  } catch(e) { console.warn('Micro indisponible:',e); audioActive=false; }
-}
-function stopAudioAnalysis() {
-  audioActive=false; audioLevel=0;
-  if (micStream){micStream.getTracks().forEach(t=>t.stop());micStream=null;}
-  analyser=null; audioBuffer=null;
-}
+function startAudioAnalysis() { audioLevel=0.16; }
+function stopAudioAnalysis() { audioLevel=0; }
 function readAudioLevel() {
-  if (!audioActive||!analyser||!audioBuffer) return 0;
-  analyser.getByteFrequencyData(audioBuffer);
-  let sum=0;
-  for (let i=0;i<audioBuffer.length;i++) sum+=audioBuffer[i];
-  const target=Math.min(1,(sum/audioBuffer.length)/100);
-  audioLevel=audioLevel+(target-audioLevel)*0.25;
+  const target=isListening ? (0.36+Math.random()*0.42) : 0;
+  const smoothing=isListening ? 0.26 : 0.18;
+  audioLevel=audioLevel+(target-audioLevel)*smoothing;
   return audioLevel;
 }
 
@@ -1701,25 +1722,57 @@ function readAudioLevel() {
 ════════════════════════════════════════════════ */
 let recognition=null, isListening=false;
 
-function setupSpeech() {
-  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if (!SR) return;
-  recognition=new SR(); recognition.lang='fr-FR'; recognition.continuous=false; recognition.interimResults=false;
-  recognition.onresult=(e)=>{ document.getElementById('textInput').value=e.results[0][0].transcript; stopListening(); sendMessage(); };
-  recognition.onerror=()=>stopListening();
-  recognition.onend=()=>{ if (isListening) stopListening(); };
+function getSpeechRecognitionCtor() {
+  return window.SpeechRecognition||window.webkitSpeechRecognition||null;
 }
-function toggleMic() { isListening ? stopListening() : startListening(); }
+function formatSpeechError(errorCode) {
+  if (!errorCode||errorCode==='aborted') return '';
+  if (errorCode==='audio-capture') return 'Aucun microphone détecté.';
+  if (errorCode==='not-allowed') return 'Accès au micro refusé. Vérifie les permissions du navigateur.';
+  if (errorCode==='service-not-allowed') return 'Reconnaissance vocale bloquée par le navigateur.';
+  if (errorCode==='network') return 'Service vocal du navigateur indisponible. Vérifie la connexion.';
+  if (errorCode==='no-speech') return 'Je n’ai rien entendu. Réessaie en parlant juste après l’activation du micro.';
+  if (errorCode==='language-not-supported') return 'Le français n’est pas supporté par la reconnaissance vocale du navigateur.';
+  return `Erreur micro : ${errorCode}.`;
+}
+function resetListeningUi() {
+  isListening=false;
+  if (sphereState==='listening') setState('idle');
+  document.getElementById('micBtn').classList.remove('listening');
+  stopAudioAnalysis();
+}
+
+function setupSpeech() {
+  recognition=null;
+}
+function toggleMic() { (isListening||recognition) ? stopListening() : startListening(); }
 function startListening() {
-  if (!recognition){addSystemMsg('Micro non supporté',true);return;}
-  isListening=true; setState('listening');
-  document.getElementById('micBtn').classList.add('listening');
-  startAudioAnalysis(); recognition.start();
+  if (recognition) return;
+  const SR=getSpeechRecognitionCtor();
+  if (!SR) { addSystemMsg('Reconnaissance vocale non supportée sur ce navigateur.',true); return; }
+  if (window.speechSynthesis?.speaking||window.speechSynthesis?.pending) window.speechSynthesis.cancel();
+  recognition=new SR();
+  recognition.lang='fr-FR'; recognition.continuous=false; recognition.interimResults=false; recognition.maxAlternatives=1;
+  recognition.onstart=()=>{ isListening=true; setState('listening'); document.getElementById('micBtn').classList.add('listening'); startAudioAnalysis(); };
+  recognition.onresult=(e)=>{
+    const transcript=(e.results?.[0]?.[0]?.transcript||'').trim();
+    resetListeningUi();
+    if (!transcript) { addSystemMsg('Je n’ai rien entendu. Réessaie.',true); return; }
+    document.getElementById('textInput').value=transcript;
+    sendMessage();
+  };
+  recognition.onerror=(e)=>{ const msg=formatSpeechError(e?.error); resetListeningUi(); if (msg) addSystemMsg(msg,true); };
+  recognition.onend=()=>{ resetListeningUi(); recognition=null; };
+  try {
+    recognition.start();
+  } catch(e) {
+    recognition=null; resetListeningUi();
+    addSystemMsg('Le micro est déjà en cours d’utilisation. Attends une seconde puis réessaie.',true);
+  }
 }
 function stopListening() {
-  isListening=false; if (sphereState==='listening') setState('idle');
-  document.getElementById('micBtn').classList.remove('listening');
-  try{recognition?.stop();}catch(e){} stopAudioAnalysis();
+  resetListeningUi();
+  try { recognition?.stop(); } catch(e) {}
 }
 
 /* ═══════════════════════════════════════════════
@@ -1781,7 +1834,7 @@ function toggleConfig() { document.getElementById('configPanel').classList.toggl
 function openTrading(evt) {
   const token = (document.getElementById('cfgToken')?.value || '').trim();
   const url = '/trading' + (token ? '?token=' + encodeURIComponent(token) : '');
-  // Si la page Jarvis n'est pas servie depuis le serveur (file://), on cible le serveur configuré.
+  // Si la page Orion n'est pas servie depuis le serveur (file://), on cible le serveur configuré.
   if (location.protocol !== 'http:' && location.protocol !== 'https:') {
     const cfg = (document.getElementById('cfgUrl')?.value || '').trim();
     if (cfg) {

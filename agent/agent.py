@@ -1,5 +1,5 @@
 """
-Jarvis — Agent Local
+Orion — Agent Local
 
 Deux modes :
   - worker (par défaut) : se connecte au serveur, attend des tool_request,
@@ -9,10 +9,10 @@ Deux modes :
   - controller : se connecte comme un client de chat (équivalent au navigateur).
 
 Variables d'env :
-  JARVIS_SERVER_URL   ex: ws://192.168.1.42:8765
-  JARVIS_DEVICE_ID    ex: telephone-dominique
-  JARVIS_SECRET_TOKEN
-  JARVIS_AGENT_MODE   worker | controller   (défaut: worker)
+  ORION_SERVER_URL   ex: ws://192.168.1.42:8765
+  ORION_DEVICE_ID    ex: telephone-dominique
+  ORION_SECRET_TOKEN
+  ORION_AGENT_MODE   worker | controller   (défaut: worker)
 """
 import os
 import sys
@@ -20,12 +20,13 @@ import json
 import asyncio
 import platform
 from pathlib import Path
+from branding import DEFAULT_SECRET_TOKEN, get_env, sync_env_aliases
 
 # Ajoute la racine du projet au path pour importer server.tools.*
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-# Charge .env de la racine du projet pour que JARVIS_SERVER_URL etc. soient dispo
+# Charge .env de la racine du projet pour que ORION_SERVER_URL etc. soient dispo
 ENV_FILE = ROOT / ".env"
 try:
     from dotenv import load_dotenv
@@ -39,14 +40,16 @@ except ImportError:
                 k, v = line.split("=", 1)
                 os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
 
+sync_env_aliases()
+
 import websockets
 
 from server.tools import ALL_HANDLERS
 
-SERVER_URL = os.getenv("JARVIS_SERVER_URL", "ws://localhost:8765")
-DEVICE_ID = os.getenv("JARVIS_DEVICE_ID", f"{platform.node()}-{platform.system().lower()}")
-SECRET_TOKEN = os.getenv("JARVIS_SECRET_TOKEN", "jarvis_secret_change_me")
-MODE = os.getenv("JARVIS_AGENT_MODE", "worker").lower()
+SERVER_URL = get_env("SERVER_URL", "ws://localhost:8765")
+DEVICE_ID = get_env("DEVICE_ID", f"{platform.node()}-{platform.system().lower()}")
+SECRET_TOKEN = get_env("SECRET_TOKEN", DEFAULT_SECRET_TOKEN)
+MODE = (get_env("AGENT_MODE", "worker") or "worker").lower()
 
 
 def device_info() -> dict:
@@ -136,7 +139,7 @@ async def run_controller():
                     ok = "✓" if data.get("result", {}).get("success", True) else "✗"
                     print(f"  [{ok} {data.get('tool')}]")
                 elif t == "response":
-                    print(f"\nJarvis : {data.get('content')}")
+                    print(f"\nOrion : {data.get('content')}")
                 elif t == "info":
                     print(f"  [i] {data.get('message')}")
 

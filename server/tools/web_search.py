@@ -1,5 +1,5 @@
 """
-Jarvis Tool — Web Search & Fetch
+Orion Tool — Web Search & Fetch
 Recherche sur le web via DuckDuckGo (gratuit, sans clé API).
 Optionnel : Brave Search API si configuré.
 """
@@ -15,7 +15,7 @@ def _duckduckgo_search(query: str, max_results: int = 5) -> list:
     encoded = urllib.parse.quote(query)
     url = f"https://api.duckduckgo.com/?q={encoded}&format=json&no_html=1&skip_disambig=1"
 
-    req = urllib.request.Request(url, headers={"User-Agent": "Jarvis/1.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": "Orion/1.0"})
     with urllib.request.urlopen(req, timeout=10) as r:
         data = json.loads(r.read().decode())
 
@@ -92,7 +92,7 @@ def web_search(query: str, max_results: int = 5) -> dict:
 def fetch_url(url: str, max_chars: int = 5000) -> dict:
     """Récupère le contenu texte d'une URL."""
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Jarvis/1.0"})
+        req = urllib.request.Request(url, headers={"User-Agent": "Orion/1.0"})
         with urllib.request.urlopen(req, timeout=15) as r:
             raw = r.read().decode("utf-8", errors="replace")
 

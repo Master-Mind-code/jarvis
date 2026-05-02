@@ -1,5 +1,5 @@
 """
-Agrégation des handlers de tous les tools Jarvis.
+Agrégation des handlers de tous les tools Orion.
 ALL_HANDLERS est consommé par l'orchestrateur pour router un tool_use Claude
 vers la bonne fonction Python.
 """

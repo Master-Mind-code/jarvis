@@ -1,5 +1,5 @@
 """
-Jarvis Trading — Analyseur IA (Claude API)
+Orion Trading — Analyseur IA (Claude API)
 Reçoit les données marché multi-TF et retourne une décision de trade
 basée sur SMC, ICT, Price Action, Supply/Demand.
 """
@@ -8,15 +8,16 @@ import json
 import re
 from anthropic import Anthropic
 from datetime import datetime
+from branding import get_env
 
 client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
 
-TRADER_MODEL = os.getenv("JARVIS_TRADER_MODEL", "claude-haiku-4-5-20251001")
+TRADER_MODEL = get_env("TRADER_MODEL", "claude-haiku-4-5-20251001")
 
 # ─────────────────────────────────────────────────────────────────
 # Prompt système du trader IA
 # ─────────────────────────────────────────────────────────────────
-TRADER_SYSTEM = """Tu es JARVIS-TRADER, un système de trading algorithmique expert de niveau institutionnel.
+TRADER_SYSTEM = """Tu es ORION-TRADER, un système de trading algorithmique expert de niveau institutionnel.
 
 Tu maîtrises :
 - SMC (Smart Money Concepts) : BOS, CHoCH, Order Blocks, FVG, Liquidité BSL/SSL

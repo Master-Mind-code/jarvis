@@ -1,5 +1,5 @@
 """
-Jarvis — Interface CLI Standalone
+Orion — Interface CLI Standalone
 Version autonome : pas besoin de serveur WebSocket.
 Tourne directement sur l'appareil avec le cerveau en local.
 Parfait pour débuter et tester sur Termux.
@@ -9,10 +9,12 @@ import sys
 import json
 from pathlib import Path
 from dotenv import load_dotenv
+from branding import sync_env_aliases
 
 # Permet d'importer les modules du projet depuis n'importe où
 sys.path.insert(0, str(Path(__file__).parent.parent))
 load_dotenv(Path(__file__).parent.parent / ".env")
+sync_env_aliases()
 
 # ─── Essaie d'importer rich pour une belle interface ─────────────
 try:
@@ -33,7 +35,7 @@ console = Console() if RICH else None
 def print_banner():
     if RICH:
         console.print(Panel(
-            "[bold cyan]J A R V I S[/bold cyan]\n"
+            "[bold cyan]O R I O N[/bold cyan]\n"
             "[dim]Assistant IA Personnel — Mode Standalone[/dim]",
             border_style="cyan",
             padding=(1, 4),
@@ -41,7 +43,7 @@ def print_banner():
         console.print("[dim]Commandes : /clear (effacer historique) | /exit (quitter) | /help[/dim]\n")
     else:
         print("=" * 50)
-        print("         J A R V I S - Assistant IA")
+        print("         O R I O N - Assistant IA")
         print("=" * 50)
         print("Commandes : /clear | /exit | /help\n")
 
@@ -72,9 +74,9 @@ def print_tool_action(tool_name: str, tool_input: dict, result: str):
 def print_response(text: str):
     if RICH:
         console.print()
-        console.print(Panel(Markdown(text), title="[bold cyan]Jarvis[/bold cyan]", border_style="cyan", padding=(0, 1)))
+        console.print(Panel(Markdown(text), title="[bold cyan]Orion[/bold cyan]", border_style="cyan", padding=(0, 1)))
     else:
-        print(f"\nJarvis : {text}\n")
+        print(f"\nOrion : {text}\n")
 
 
 def print_user_input_prompt():
@@ -161,9 +163,9 @@ def main():
 
         # Traitement par le cerveau
         if RICH:
-            console.print("\n[dim]Jarvis réfléchit...[/dim]")
+            console.print("\n[dim]Orion réfléchit...[/dim]")
         else:
-            print("\n[Jarvis réfléchit...]")
+            print("\n[Orion réfléchit...]")
 
         try:
             response, conversation_history = process_request(

@@ -1,18 +1,20 @@
 """
-Jarvis — Orchestrateur Central
+Orion — Orchestrateur Central
 Cerveau de l'assistant : reçoit une requête, appelle un LLM (Anthropic ou Gemini),
 exécute les tools, retourne la réponse finale.
 
-Provider sélectionné via JARVIS_PROVIDER (défaut: anthropic).
+Provider sélectionné via ORION_PROVIDER (défaut: anthropic).
 """
 import os
 import json
 from pathlib import Path
 from dotenv import load_dotenv
+from branding import sync_env_aliases
 
 # Charge .env depuis la racine du projet AVANT d'instancier les clients LLM
 # (sinon les variables ne sont pas encore définies quand main.py importe ce module).
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+sync_env_aliases()
 
 from server.tools import ALL_HANDLERS
 from server.providers import get_provider
@@ -211,11 +213,11 @@ for _tool in TOOLS:
         }
 
 # ─────────────────────────────────────────────────────────────────
-# Prompt système de Jarvis
+# Prompt système d'Orion
 # ─────────────────────────────────────────────────────────────────
 MAX_ITERATIONS = 25
 
-SYSTEM_PROMPT = """Tu es Jarvis, un assistant IA personnel ultra-compétent.
+SYSTEM_PROMPT = """Tu es Orion, un assistant IA personnel ultra-compétent.
 Tu travailles directement sur l'appareil de l'utilisateur.
 
 Tes capacités :

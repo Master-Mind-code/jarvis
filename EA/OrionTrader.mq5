@@ -1,10 +1,10 @@
 //+------------------------------------------------------------------+
-//|                                    JarvisTrader.mq5              |
-//|                     Jarvis — Data Collector + Trade Executor      |
-//|  Collecte les données OHLCV sur 5 TF, envoie à Jarvis,          |
+//|                                    OrionTrader.mq5               |
+//|                     Orion — Data Collector + Trade Executor       |
+//|  Collecte les données OHLCV sur 5 TF, envoie à Orion,           |
 //|  reçoit les ordres et les exécute sur MT5.                       |
 //+------------------------------------------------------------------+
-#property copyright "Jarvis Trading System"
+#property copyright "Orion Trading System"
 #property version   "2.0"
 #property strict
 
@@ -12,8 +12,8 @@
 #include <Trade\PositionInfo.mqh>
 
 //--- Paramètres
-input string   JarvisURL       = "http://127.0.0.1:8765";  // URL du serveur Jarvis
-input string   JarvisToken     = "jarvis_secret_change_me"; // Token secret
+input string   OrionURL        = "http://127.0.0.1:8765";  // URL du serveur Orion
+input string   OrionToken      = "orion_secret_change_me"; // Token secret
 input string   Symbol_         = "XAUUSDm";                 // Symbole à trader
 input double   RiskPercent     = 1.0;                       // Risque par trade (%)
 input int      MagicNumber     = 20250101;                  // Magic number
@@ -37,13 +37,13 @@ int OnInit() {
    trade.SetDeviationInPoints(20);
    trade.SetTypeFilling(ORDER_FILLING_IOC);
    EventSetTimer(1);
-   Print("[JARVIS] EA initialisé — Symbole: ", Symbol_, " | URL: ", JarvisURL);
+   Print("[ORION] EA initialisé — Symbole: ", Symbol_, " | URL: ", OrionURL);
    return(INIT_SUCCEEDED);
 }
 
 void OnDeinit(const int reason) {
    EventKillTimer();
-   Print("[JARVIS] EA arrêté.");
+   Print("[ORION] EA arrêté.");
 }
 
 //+------------------------------------------------------------------+
@@ -58,7 +58,7 @@ void OnTimer() {
       lastDataSend = now;
    }
 
-   // Vérification commandes Jarvis toutes les 3 secondes
+   // Vérification commandes Orion toutes les 3 secondes
    if (AutoTrade && now - lastCmdCheck >= 3) {
       CheckAndExecuteCommands();
       lastCmdCheck = now;
@@ -73,9 +73,9 @@ void SendMarketData() {
    string response = "";
    int res = HTTPSend("/api/market-data", json, response);
    if (res == 200)
-      Print("[JARVIS] Données envoyées OK");
+      Print("[ORION] Données envoyées OK");
    else
-      Print("[JARVIS] Erreur envoi données: ", res);
+      Print("[ORION] Erreur envoi données: ", res);
 }
 
 string BuildMarketDataJSON() {
@@ -176,7 +176,7 @@ string GetOpenPositionsJSON() {
 }
 
 //+------------------------------------------------------------------+
-//| Vérification et exécution des commandes Jarvis                   |
+//| Vérification et exécution des commandes Orion                    |
 //+------------------------------------------------------------------+
 void CheckAndExecuteCommands() {
    string response = "";
@@ -187,7 +187,7 @@ void CheckAndExecuteCommands() {
    string action = ExtractJSONString(response, "action");
    if (action == "none" || action == "") return;
 
-   Print("[JARVIS] Commande reçue: ", response);
+   Print("[ORION] Commande reçue: ", response);
 
    if (action == "BUY" || action == "SELL") {
       double entry    = ExtractJSONDouble(response, "entry");
@@ -205,11 +205,11 @@ void CheckAndExecuteCommands() {
          ok = trade.Sell(lot, Symbol_, 0, sl, tp, comment);
 
       if (ok)
-         Print("[JARVIS] Ordre exécuté: ", action, " | Lot:", lot, " SL:", sl, " TP:", tp);
+         Print("[ORION] Ordre exécuté: ", action, " | Lot:", lot, " SL:", sl, " TP:", tp);
       else
-         Print("[JARVIS] Erreur ordre: ", GetLastError());
+         Print("[ORION] Erreur ordre: ", GetLastError());
 
-      // Confirme l'exécution à Jarvis
+      // Confirme l'exécution à Orion
       string confirm = "{\"action\":\"" + action + "\",\"executed\":" + (ok ? "true" : "false") + ",\"ticket\":" + (string)trade.ResultOrder() + "}";
       string r2 = "";
       HTTPSend("/api/trade-confirm", confirm, r2);
@@ -257,18 +257,18 @@ double CalculateLotSize(double sl_price) {
 //| HTTP helpers                                                      |
 //+------------------------------------------------------------------+
 int HTTPSend(string endpoint, string body, string &response) {
-   string headers = "Content-Type: application/json\r\nX-Jarvis-Token: " + JarvisToken + "\r\n";
+   string headers = "Content-Type: application/json\r\nX-Orion-Token: " + OrionToken + "\r\n";
    char   bodyArr[], resArr[];
    StringToCharArray(body, bodyArr, 0, StringLen(body));
-   int code = WebRequest("POST", JarvisURL + endpoint, headers, httpTimeout, bodyArr, resArr, headers);
+   int code = WebRequest("POST", OrionURL + endpoint, headers, httpTimeout, bodyArr, resArr, headers);
    if (ArraySize(resArr) > 0) response = CharArrayToString(resArr);
    return code;
 }
 
 int HTTPGet(string endpoint, string &response) {
-   string headers = "X-Jarvis-Token: " + JarvisToken + "\r\n";
+   string headers = "X-Orion-Token: " + OrionToken + "\r\n";
    char   bodyArr[], resArr[];
-   int code = WebRequest("GET", JarvisURL + endpoint, headers, httpTimeout, bodyArr, resArr, headers);
+   int code = WebRequest("GET", OrionURL + endpoint, headers, httpTimeout, bodyArr, resArr, headers);
    if (ArraySize(resArr) > 0) response = CharArrayToString(resArr);
    return code;
 }

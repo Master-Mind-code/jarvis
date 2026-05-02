@@ -1,5 +1,5 @@
 """
-Jarvis Trading — Gestionnaire de Trades
+Orion Trading — Gestionnaire de Trades
 Stocke et gère l'état des trades, l'historique, les statistiques.
 """
 import json

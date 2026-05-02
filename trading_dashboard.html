@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>JARVIS — Trading</title>
+<title>ORION — Trading</title>
+<link rel="icon" href="assets/orion-mark.svg" type="image/svg+xml">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -22,8 +23,10 @@ body::before { content:''; position:fixed; inset:0; background-image:linear-grad
 
 /* ── Header ── */
 header { position:relative; z-index:10; display:flex; align-items:center; justify-content:space-between; padding:12px 24px; border-bottom:1px solid var(--border); background:rgba(6,9,15,0.96); gap:16px; flex-wrap:wrap; }
-.logo { font-family:'Orbitron',monospace; font-size:16px; font-weight:900; letter-spacing:6px; color:var(--cyan); text-shadow:0 0 15px rgba(0,212,255,0.5); white-space:nowrap; }
-.logo span { color:#fff; }
+.logo { display:flex; align-items:center; gap:12px; white-space:nowrap; }
+.logo-mark { width:28px; height:28px; display:block; filter:drop-shadow(0 0 12px rgba(0,212,255,0.4)); }
+.logo-text { display:flex; flex-direction:column; font-family:'Orbitron',monospace; font-size:14px; font-weight:900; letter-spacing:5px; color:var(--cyan); text-shadow:0 0 15px rgba(0,212,255,0.5); line-height:1; }
+.logo-text span { margin-top:4px; color:var(--text2); font-size:8px; letter-spacing:3px; }
 
 .back-btn { font-family:'Orbitron',monospace; font-size:9px; letter-spacing:2px; padding:6px 12px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); border-radius:2px; text-decoration:none; transition:all .2s; }
 .back-btn:hover { border-color:var(--cyan); color:var(--cyan); background:var(--cyan3); }
@@ -155,8 +158,11 @@ header { position:relative; z-index:10; display:flex; align-items:center; justif
 
 <header>
   <div style="display:flex;align-items:center;gap:14px;">
-    <a href="/" class="back-btn">◄ JARVIS</a>
-    <div class="logo">JAR<span>VIS</span> <span style="font-size:9px;letter-spacing:3px;color:var(--text2)">TRADER</span></div>
+    <a href="/" class="back-btn">◄ ORION</a>
+    <div class="logo">
+      <img class="logo-mark" src="assets/orion-mark.svg" alt="Logo Orion">
+      <div class="logo-text">ORION<span>TRADER</span></div>
+    </div>
   </div>
 
   <div class="header-mid">
@@ -201,7 +207,7 @@ header { position:relative; z-index:10; display:flex; align-items:center; justif
 
       <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
         <span class="param-label">TOKEN</span>
-        <input style="width:200px" class="param-input" type="password" id="cfgToken" placeholder="JARVIS_SECRET_TOKEN">
+        <input style="width:200px" class="param-input" type="password" id="cfgToken" placeholder="ORION_SECRET_TOKEN">
       </div>
     </div>
   </div>
@@ -282,7 +288,7 @@ header { position:relative; z-index:10; display:flex; align-items:center; justif
 
 <script>
 /* ── Auto-config (URL = même origine que la page, token via ?token= ou localStorage) ── */
-const TOKEN_KEY = 'jarvis_trading_token';
+const TOKEN_KEY = 'orion_trading_token';
 
 (function autoConfig() {
   const params = new URLSearchParams(location.search);
@@ -301,7 +307,7 @@ const TOKEN_KEY = 'jarvis_trading_token';
 const HTTP_BASE = () => `${location.protocol}//${location.host}`;
 const WS_BASE   = () => `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}`;
 const TOKEN     = () => document.getElementById('cfgToken').value.trim();
-const headers   = () => ({ 'Content-Type':'application/json', 'X-Jarvis-Token': TOKEN() });
+const headers   = () => ({ 'Content-Type':'application/json', 'X-Orion-Token': TOKEN() });
 
 let ws = null;
 let connected = false;
@@ -330,7 +336,7 @@ function connectDashboard() {
   ws.onopen = () => {
     connected = true;
     setStatus('active', 'EN LIGNE');
-    log('Connecté au serveur Jarvis', 'success');
+    log('Connecté au serveur Orion', 'success');
     toast('Connecté', 'ok');
     // Heartbeat : garde la WS ouverte (sinon proxy/navigateur ferment au bout de ~30 s)
     if (heartbeatTimer) clearInterval(heartbeatTimer);
@@ -581,7 +587,7 @@ function toast(msg, type = 'info') {
 }
 
 // ── Init ──
-log('Dashboard Jarvis Trader initialisé', 'info');
+log('Dashboard Orion Trader initialisé', 'info');
 log('Renseigne le token et clique CONNECTER', 'info');
 
 // Connexion automatique si un token est déjà en mémoire
