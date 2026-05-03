@@ -12,6 +12,9 @@ from .screenshot import HANDLERS as _SCREEN_HANDLERS
 from .documents import HANDLERS as _DOC_HANDLERS
 from .automation import HANDLERS as _AUTO_HANDLERS
 from .termux_mobile import HANDLERS as _TERMUX_HANDLERS
+from .vision import HANDLERS as _VISION_HANDLERS
+from .audit_query import HANDLERS as _AUDIT_HANDLERS
+from server.safety_backup import HANDLERS as _BACKUP_HANDLERS
 
 # Tools optionnels (dépendances lourdes ou configurables) : import tolérant
 def _optional(module_name: str) -> dict:
@@ -40,6 +43,9 @@ ALL_HANDLERS = {
     **_DOC_HANDLERS,
     **_AUTO_HANDLERS,
     **_TERMUX_HANDLERS,
+    **_VISION_HANDLERS,
+    **_AUDIT_HANDLERS,
+    **_BACKUP_HANDLERS,
     **_GOOGLE_HANDLERS,
     **_IMAGE_HANDLERS,
     **_MEMORY_HANDLERS,

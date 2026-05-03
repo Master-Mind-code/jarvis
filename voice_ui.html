@@ -1,0 +1,1569 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ORION · Voice</title>
+<link rel="icon" href="assets/orion-mark.svg" type="image/svg+xml">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Space+Grotesk:wght@300;400;500&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --cyan:       #00e5ff;
+  --cyan-dim:   rgba(0,229,255,0.08);
+  --cyan-glow:  rgba(0,229,255,0.4);
+  --gold:       #f5c518;
+  --green:      #00ffa3;
+  --red:        #ff3b5c;
+  --bg:         #04060d;
+  --bg2:        #080e1e;
+  --bg3:        rgba(6,14,32,0.72);
+  --text:       #b8d8f0;
+  --text-dim:   rgba(120,170,210,0.45);
+  --border:     rgba(0,229,255,0.1);
+  --border-hi:  rgba(0,229,255,0.35);
+}
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Space Grotesk', sans-serif;
+  min-height: 100vh;
+  overflow: hidden;
+  position: relative;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(0,229,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,229,255,0.025) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none; z-index: 0;
+}
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(4,6,13,0.9) 100%);
+  pointer-events: none; z-index: 0;
+}
+
+/* ─── Header simple ─── */
+header {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg3);
+  backdrop-filter: blur(18px);
+}
+.logo { display: flex; align-items: center; gap: 12px; }
+.logo-mark { width: 28px; height: 28px; }
+.logo-word {
+  font-family: 'Orbitron', monospace;
+  font-size: 14px;
+  letter-spacing: 5px;
+  font-weight: 900;
+  color: var(--cyan);
+  text-shadow: 0 0 12px var(--cyan-glow);
+}
+.logo-word span {
+  display: block;
+  font-size: 7px;
+  letter-spacing: 4px;
+  color: var(--text-dim);
+  font-weight: 400;
+  margin-top: 2px;
+}
+.header-right { display: flex; align-items: center; gap: 10px; }
+.live-clock {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 1.5px;
+}
+.status-pill {
+  display: flex; align-items: center; gap: 7px;
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  border-radius: 2px;
+  font-family: 'Orbitron', monospace;
+  font-size: 9px;
+  letter-spacing: 2.5px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+.status-pill.connected { border-color: rgba(0,255,163,0.35); color: var(--green); }
+.status-pill.connected .s-dot { background: var(--green); box-shadow: 0 0 8px var(--green); }
+.s-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: rgba(120,170,210,0.4);
+  animation: pulse-dot 2.5s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%,100% { opacity:1; transform:scale(1); }
+  50%      { opacity:0.35; transform:scale(0.6); }
+}
+.btn-back, .btn-cfg {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 0 14px; height: 36px;
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  border-radius: 2px;
+  cursor: pointer;
+  color: var(--text-dim);
+  font-family: 'Orbitron', monospace;
+  font-size: 9px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+.btn-back:hover, .btn-cfg:hover {
+  border-color: var(--border-hi);
+  color: var(--cyan);
+  background: rgba(0,229,255,0.06);
+}
+.btn-cfg svg { width: 14px; height: 14px; }
+
+/* ─── Voice panel : pleine largeur centrée ─── */
+.voice-panel {
+  position: relative;
+  z-index: 5;
+  height: calc(100vh - 65px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 22px;
+}
+
+/* Anneaux décoratifs */
+.ring-outer {
+  position: absolute;
+  width: 460px; height: 460px;
+  top: 50%; left: 50%; transform: translate(-50%, -56%);
+  border-radius: 50%;
+  border: 1px solid rgba(0,229,255,0.08);
+  animation: ring-spin 20s linear infinite;
+  pointer-events: none; z-index: 1;
+}
+.ring-outer::before {
+  content: '';
+  position: absolute;
+  top: -1px; left: 20%;
+  width: 60%; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+  box-shadow: 0 0 12px var(--cyan-glow);
+}
+@keyframes ring-spin { from { transform: translate(-50%,-56%) rotate(0deg); } to { transform: translate(-50%,-56%) rotate(360deg); } }
+.ring-mid {
+  position: absolute;
+  width: 380px; height: 380px;
+  top: 50%; left: 50%; transform: translate(-50%, -56%);
+  border-radius: 50%;
+  border: 1px dashed rgba(0,229,255,0.06);
+  animation: ring-spin-mid 35s linear infinite reverse;
+  pointer-events: none; z-index: 1;
+}
+@keyframes ring-spin-mid { from { transform: translate(-50%,-56%) rotate(0deg); } to { transform: translate(-50%,-56%) rotate(-360deg); } }
+
+/* HUD readouts (4 coins) */
+.hud-readout {
+  position: fixed;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+  line-height: 1.8;
+  z-index: 6;
+}
+.hud-readout.top-left  { top: 90px; left: 30px; }
+.hud-readout.top-right { top: 90px; right: 30px; text-align: right; }
+.hud-readout.bot-left  { bottom: 230px; left: 30px; }
+.hud-readout.bot-right { bottom: 230px; right: 30px; text-align: right; }
+.hud-val { color: var(--cyan); font-size: 10px; }
+
+/* Sphère canvas */
+#sphereCanvas {
+  display: block;
+  position: relative;
+  z-index: 3;
+  margin-top: -40px;
+}
+
+/* Footer sphère (state) */
+.sphere-footer {
+  position: relative;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: -40px;
+}
+.sphere-shape-label {
+  font-family: 'Orbitron', monospace;
+  font-size: 9px;
+  letter-spacing: 4px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+.sphere-state-text {
+  font-family: 'Orbitron', monospace;
+  font-size: 14px;
+  letter-spacing: 6px;
+  color: var(--cyan);
+  text-shadow: 0 0 18px var(--cyan-glow);
+  text-transform: uppercase;
+  transition: color 0.4s, text-shadow 0.4s;
+  height: 22px;
+}
+.voice-panel.state--listening  .sphere-state-text { color: var(--red); text-shadow: 0 0 18px rgba(255,59,92,0.6); }
+.voice-panel.state--processing .sphere-state-text { color: var(--gold); text-shadow: 0 0 18px rgba(245,197,24,0.6); }
+.voice-panel.state--speaking   .sphere-state-text { color: var(--green); text-shadow: 0 0 18px rgba(0,255,163,0.6); }
+
+/* Transcript (dernier user / dernière réponse) */
+.transcript-zone {
+  position: relative;
+  z-index: 4;
+  margin-top: 24px;
+  width: 100%;
+  max-width: 720px;
+  min-height: 100px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: center;
+}
+.transcript-line {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 14px;
+  line-height: 1.55;
+  padding: 8px 0;
+  opacity: 0.85;
+}
+.transcript-line.user {
+  color: var(--text-dim);
+  font-style: italic;
+}
+.transcript-line.user::before {
+  content: '« ';
+  color: var(--cyan);
+}
+.transcript-line.user::after {
+  content: ' »';
+  color: var(--cyan);
+}
+.transcript-line.orion {
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 500;
+}
+.transcript-tool {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--gold);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+/* Bouton micro XL */
+.mic-zone {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.mic-btn-xl {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  border: 2px solid var(--border-hi);
+  background: radial-gradient(circle at 30% 30%, rgba(0,229,255,0.18), var(--bg2));
+  color: var(--cyan);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.25s;
+  position: relative;
+  box-shadow:
+    inset 0 0 22px rgba(0,229,255,0.12),
+    0 0 30px rgba(0,229,255,0.18);
+}
+.mic-btn-xl:hover {
+  border-color: var(--cyan);
+  box-shadow:
+    inset 0 0 28px rgba(0,229,255,0.2),
+    0 0 40px var(--cyan-glow);
+}
+.mic-btn-xl svg { width: 32px; height: 32px; stroke: currentColor; fill: none; stroke-width: 1.5; }
+.mic-btn-xl.listening {
+  border-color: var(--red);
+  color: var(--red);
+  background: radial-gradient(circle at 30% 30%, rgba(255,59,92,0.25), var(--bg2));
+  box-shadow:
+    inset 0 0 28px rgba(255,59,92,0.2),
+    0 0 50px rgba(255,59,92,0.4);
+  animation: mic-pulse 1.2s ease-in-out infinite;
+}
+@keyframes mic-pulse {
+  0%,100% { transform: scale(1); }
+  50%     { transform: scale(1.05); }
+}
+.mic-hint {
+  font-family: 'Orbitron', monospace;
+  font-size: 9px;
+  letter-spacing: 3px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  text-align: center;
+}
+
+/* Barres énergie en bas */
+.energy-bar-wrap {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(560px, 90vw);
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.energy-row { display: flex; align-items: center; gap: 10px; }
+.energy-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  color: var(--text-dim);
+  min-width: 56px;
+  text-transform: uppercase;
+}
+.energy-track {
+  flex: 1;
+  height: 2px;
+  background: rgba(0,229,255,0.06);
+  border-radius: 1px;
+  overflow: hidden;
+}
+.energy-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--cyan), rgba(0,229,255,0.6));
+  border-radius: 1px;
+  transition: width 0.6s ease;
+  box-shadow: 0 0 6px var(--cyan-glow);
+}
+.energy-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--text-dim);
+  min-width: 36px;
+  text-align: right;
+}
+
+/* Config panel (réutilise pattern d'orion_ui) */
+.config-panel {
+  position: fixed;
+  top: 70px; right: 22px;
+  width: 320px;
+  background: var(--bg3);
+  backdrop-filter: blur(18px);
+  border: 1px solid var(--border-hi);
+  border-radius: 4px;
+  padding: 18px;
+  z-index: 30;
+  display: none;
+}
+.config-panel.show { display: block; }
+.cfg-title {
+  font-family: 'Orbitron', monospace;
+  font-size: 10px;
+  letter-spacing: 3px;
+  color: var(--cyan);
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+.cfg-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  margin: 10px 0 4px;
+}
+.config-panel input {
+  width: 100%;
+  padding: 8px 10px;
+  background: rgba(0,0,0,0.4);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  outline: none;
+}
+.config-panel input:focus { border-color: var(--cyan); }
+.cfg-btns { display: flex; gap: 8px; margin-top: 14px; }
+.btn-cfg-action {
+  flex: 1;
+  padding: 8px;
+  background: rgba(0,229,255,0.1);
+  border: 1px solid var(--border-hi);
+  border-radius: 2px;
+  color: var(--cyan);
+  font-family: 'Orbitron', monospace;
+  font-size: 9px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-cfg-action:hover { background: rgba(0,229,255,0.2); }
+.btn-cfg-action.danger {
+  background: rgba(255,59,92,0.08);
+  border-color: rgba(255,59,92,0.35);
+  color: var(--red);
+}
+.btn-cfg-action.danger:hover { background: rgba(255,59,92,0.18); }
+
+/* Notif système (toast en haut) */
+.toast {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-100%);
+  background: var(--bg3);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--border-hi);
+  border-radius: 2px;
+  padding: 10px 18px;
+  z-index: 50;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text);
+  letter-spacing: 1px;
+  opacity: 0;
+  transition: all 0.4s;
+  max-width: 80vw;
+}
+.toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+.toast.error { border-color: rgba(255,59,92,0.4); color: var(--red); }
+
+/* ── Modal de confirmation par mot de passe ── */
+.confirm-overlay {
+  position: fixed; inset: 0;
+  background: rgba(4,6,13,0.88);
+  backdrop-filter: blur(12px);
+  z-index: 100;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.confirm-overlay.show { display: flex; }
+.confirm-modal {
+  background: var(--bg2);
+  border: 1px solid rgba(255,59,92,0.45);
+  border-radius: 4px;
+  padding: 28px 32px;
+  max-width: 480px;
+  width: 90%;
+  box-shadow: 0 0 60px rgba(255,59,92,0.18), 0 20px 40px rgba(0,0,0,0.6);
+  position: relative;
+}
+.confirm-modal::before {
+  content: '';
+  position: absolute;
+  top: -1px; left: 20%;
+  width: 60%; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--red), transparent);
+  box-shadow: 0 0 14px var(--red);
+}
+.confirm-title {
+  font-family: 'Orbitron', monospace;
+  font-size: 13px;
+  letter-spacing: 4px;
+  color: var(--red);
+  text-transform: uppercase;
+  text-align: center;
+  margin-bottom: 6px;
+}
+.confirm-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  text-align: center;
+  margin-bottom: 18px;
+}
+.confirm-tool {
+  background: rgba(255,59,92,0.08);
+  border: 1px solid rgba(255,59,92,0.25);
+  border-radius: 2px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text);
+  word-break: break-all;
+}
+.confirm-tool b { color: var(--red); }
+.confirm-input {
+  width: 100%;
+  padding: 12px 14px;
+  background: rgba(0,0,0,0.5);
+  border: 1px solid rgba(255,59,92,0.4);
+  border-radius: 2px;
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  letter-spacing: 4px;
+  text-align: center;
+  outline: none;
+  margin-bottom: 12px;
+}
+.confirm-input:focus { border-color: var(--red); box-shadow: 0 0 14px rgba(255,59,92,0.25); }
+.confirm-error {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--red);
+  text-align: center;
+  margin-bottom: 12px;
+  min-height: 14px;
+}
+.confirm-timer {
+  font-family: 'Orbitron', monospace;
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--text-dim);
+  text-align: center;
+  margin-bottom: 16px;
+}
+.confirm-btns { display: flex; gap: 10px; }
+.confirm-btn {
+  flex: 1;
+  padding: 11px;
+  border: 1px solid;
+  border-radius: 2px;
+  font-family: 'Orbitron', monospace;
+  font-size: 10px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: transparent;
+}
+.confirm-btn.deny { border-color: var(--border); color: var(--text-dim); }
+.confirm-btn.deny:hover { color: var(--text); border-color: var(--border-hi); }
+.confirm-btn.approve {
+  border-color: rgba(255,59,92,0.5);
+  color: var(--red);
+  background: rgba(255,59,92,0.05);
+}
+.confirm-btn.approve:hover { background: rgba(255,59,92,0.18); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <img class="logo-mark" src="assets/orion-mark.svg" alt="Orion">
+    <div class="logo-word">ORION<span>VOICE MODE</span></div>
+  </div>
+  <div class="header-right">
+    <div class="live-clock" id="liveClock">--:--:--</div>
+    <div class="status-pill" id="connStatus">
+      <div class="s-dot"></div>
+      <span id="connText">HORS LIGNE</span>
+    </div>
+    <a href="/" class="btn-back" title="Retour à l'UI principale">← CHAT</a>
+    <button class="btn-cfg" title="Paramètres" onclick="toggleConfig()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<!-- HUD readouts (les 4 coins) -->
+<div class="hud-readout top-left">
+  SYS / NEURAL<br>
+  LOAD&nbsp;&nbsp;<span class="hud-val" id="hudLoad">72%</span><br>
+  TEMP&nbsp;&nbsp;<span class="hud-val" id="hudTemp">38°C</span>
+</div>
+<div class="hud-readout top-right">
+  RÉSEAU<br>
+  LAT&nbsp;&nbsp;&nbsp;<span class="hud-val" id="hudLat">12ms</span><br>
+  PKT&nbsp;&nbsp;&nbsp;<span class="hud-val" id="hudPkt">99.8%</span>
+</div>
+<div class="hud-readout bot-left">
+  ROT&nbsp;&nbsp;<span class="hud-val" id="hudRot">0.00</span><br>
+  FREQ&nbsp;<span class="hud-val" id="hudFreq">1.4kHz</span>
+</div>
+<div class="hud-readout bot-right">
+  SHAPE<br>
+  <span class="hud-val">SPHÈRE</span>
+</div>
+
+<!-- Voice panel principal -->
+<div class="voice-panel" id="voicePanel">
+  <div class="ring-outer"></div>
+  <div class="ring-mid"></div>
+
+  <canvas id="sphereCanvas" width="380" height="380"></canvas>
+
+  <div class="sphere-footer">
+    <div class="sphere-shape-label">Réseau neuronal IA</div>
+    <div class="sphere-state-text" id="sphereStateText">STANDBY</div>
+  </div>
+
+  <div class="transcript-zone">
+    <div class="transcript-line user" id="txUser" style="display:none"></div>
+    <div class="transcript-line orion" id="txOrion">Appuie sur le micro pour parler.</div>
+    <div class="transcript-tool" id="txTool" style="display:none"></div>
+  </div>
+</div>
+
+<!-- Bouton micro XL -->
+<div class="mic-zone">
+  <button class="mic-btn-xl" id="micBtn" onclick="toggleMic()" title="Parler à Orion">
+    <svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10c0 3.866 3.134 7 7 7s7-3.134 7-7"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="9" y1="21" x2="15" y2="21"/></svg>
+  </button>
+  <div class="mic-hint" id="micHint">Appuie ou clique pour parler</div>
+</div>
+
+<!-- Barres énergie -->
+<div class="energy-bar-wrap">
+  <div class="energy-row">
+    <div class="energy-label">NEURAL</div>
+    <div class="energy-track"><div class="energy-fill" id="efNeural" style="width:72%"></div></div>
+    <div class="energy-val" id="evNeural">72%</div>
+  </div>
+  <div class="energy-row">
+    <div class="energy-label">VOICE</div>
+    <div class="energy-track"><div class="energy-fill" id="efVoice" style="width:0%"></div></div>
+    <div class="energy-val" id="evVoice">0%</div>
+  </div>
+  <div class="energy-row">
+    <div class="energy-label">NET</div>
+    <div class="energy-track"><div class="energy-fill" id="efNet" style="width:35%"></div></div>
+    <div class="energy-val" id="evNet">35%</div>
+  </div>
+</div>
+
+<!-- Toast notifications -->
+<div class="toast" id="toast"></div>
+
+<!-- Modal de confirmation par mot de passe -->
+<div class="confirm-overlay" id="confirmOverlay" role="dialog" aria-modal="true">
+  <div class="confirm-modal">
+    <div class="confirm-title">⚠ Confirmation requise</div>
+    <div class="confirm-sub" id="confirmReason">Action sensible</div>
+    <div class="confirm-tool" id="confirmDetail"></div>
+    <input type="password" class="confirm-input" id="confirmPwd"
+           placeholder="· · · · · ·" autocomplete="off"/>
+    <div class="confirm-error" id="confirmError"></div>
+    <div class="confirm-timer" id="confirmTimer"></div>
+    <div class="confirm-btns">
+      <button class="confirm-btn deny"     onclick="confirmDeny()">Annuler</button>
+      <button class="confirm-btn approve"  onclick="confirmApprove()">Autoriser</button>
+    </div>
+  </div>
+</div>
+
+<!-- Config panel (caché par défaut) -->
+<div class="config-panel" id="configPanel">
+  <div class="cfg-title">Paramètres</div>
+  <div class="cfg-label">URL Serveur</div>
+  <input type="text" id="cfgUrl" value="ws://localhost:8765"/>
+  <div class="cfg-label">Token secret</div>
+  <input type="password" id="cfgToken" value=""/>
+  <div class="cfg-label">Device ID</div>
+  <input type="text" id="cfgDevice" value="voice-browser"/>
+  <div class="cfg-btns">
+    <button class="btn-cfg-action" onclick="connect()">Connecter</button>
+    <button class="btn-cfg-action danger" onclick="disconnect()">Déconnecter</button>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════
+   AUTO-CONFIG (URL serveur depuis location)
+════════════════════════════════════════════════ */
+(function(){
+  if (location.protocol==='http:'||location.protocol==='https:') {
+    const wsProto = location.protocol==='https:' ? 'wss:' : 'ws:';
+    document.getElementById('cfgUrl').value = `${wsProto}//${location.host}`;
+  }
+})();
+
+/* ═══════════════════════════════════════════════
+   HORLOGE + HUD random
+════════════════════════════════════════════════ */
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2,'0');
+  const m = String(now.getMinutes()).padStart(2,'0');
+  const s = String(now.getSeconds()).padStart(2,'0');
+  document.getElementById('liveClock').textContent = `${h}:${m}:${s}`;
+}
+setInterval(updateClock, 1000); updateClock();
+
+setInterval(() => {
+  document.getElementById('hudLoad').textContent = Math.round(65 + Math.random()*20) + '%';
+  document.getElementById('hudTemp').textContent = (38 + Math.random()*4 - 2).toFixed(1) + '°C';
+  document.getElementById('hudLat').textContent  = Math.round(8 + Math.random()*20) + 'ms';
+  document.getElementById('hudPkt').textContent  = (99.5 + Math.random()*0.5).toFixed(1) + '%';
+  document.getElementById('hudRot').textContent  = (rotY % (Math.PI*2)).toFixed(2);
+  document.getElementById('efNeural').style.width = (60+Math.random()*30) + '%';
+  document.getElementById('evNeural').textContent = Math.round(60+Math.random()*30) + '%';
+  if (sphereState !== 'listening') {
+    document.getElementById('efVoice').style.width = Math.round(Math.random()*15) + '%';
+    document.getElementById('evVoice').textContent = Math.round(Math.random()*15) + '%';
+  }
+  document.getElementById('efNet').style.width = Math.round(25+Math.random()*25) + '%';
+  document.getElementById('evNet').textContent = Math.round(25+Math.random()*25) + '%';
+}, 1200);
+
+/* ═══════════════════════════════════════════════
+   SPHÈRE 3D — réseau neuronal morphique (10 formes)
+   Porté de orion_ui.html : sphere, star, cube, arc reactor, atome,
+   hub neuronal, tore, visage IA, lettre D, "DOMINIQUE".
+════════════════════════════════════════════════ */
+const canvas = document.getElementById('sphereCanvas');
+const ctx = canvas.getContext('2d');
+const W = 380, H = 380;
+const CX = W/2, CY = H/2;
+const RADIUS = 138;
+const N_PARTICLES = 130;
+const CONNECT_DIST = 55;
+let sphereState = 'idle';
+let frame = 0;
+let rotX = 0, rotY = 0;
+
+function shapeSphere(n, r) {
+  const pts = [];
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  for (let i = 0; i < n; i++) {
+    const y = 1 - (i/(n-1))*2;
+    const rad = Math.sqrt(1-y*y);
+    const theta = golden*i;
+    pts.push({ x: Math.cos(theta)*rad*r, y: y*r, z: Math.sin(theta)*rad*r });
+  }
+  return pts;
+}
+
+function shapeStar(n, r) {
+  const pts = [];
+  const arms = 5, innerR = r*0.4;
+  const verts = [];
+  for (let i = 0; i < arms*2; i++) {
+    const angle = (i*Math.PI)/arms - Math.PI/2;
+    const radius = i%2===0 ? r : innerR;
+    verts.push({ x: Math.cos(angle)*radius, y: Math.sin(angle)*radius });
+  }
+  const segs = []; let total = 0;
+  for (let i = 0; i < verts.length; i++) {
+    const a = verts[i], b = verts[(i+1)%verts.length];
+    const len = Math.hypot(b.x-a.x, b.y-a.y);
+    segs.push({a,b,len}); total += len;
+  }
+  let acc = 0, segIdx = 0;
+  for (let i = 0; i < n; i++) {
+    const target = i*(total/n);
+    while (segIdx < segs.length-1 && acc+segs[segIdx].len < target) { acc+=segs[segIdx].len; segIdx++; }
+    const t = (target-acc)/segs[segIdx].len;
+    const {a,b} = segs[segIdx];
+    pts.push({ x: a.x+(b.x-a.x)*t, y: a.y+(b.y-a.y)*t, z: (Math.random()-0.5)*r*0.15 });
+  }
+  return pts;
+}
+
+function shapeCube(n, r) {
+  const s = r*0.78;
+  const corners = [[-s,-s,-s],[s,-s,-s],[s,s,-s],[-s,s,-s],[-s,-s,s],[s,-s,s],[s,s,s],[-s,s,s]];
+  const edges = [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+  const pts = []; const perEdge = Math.max(2, Math.floor(n/edges.length));
+  for (const [a,b] of edges) {
+    const ca=corners[a], cb=corners[b];
+    for (let i = 0; i < perEdge; i++) { const t=i/(perEdge-1); pts.push({x:ca[0]+(cb[0]-ca[0])*t, y:ca[1]+(cb[1]-ca[1])*t, z:ca[2]+(cb[2]-ca[2])*t}); }
+  }
+  while (pts.length < n) pts.push({...pts[pts.length%edges.length]});
+  return pts.slice(0, n);
+}
+
+function shapeArcReactor(n, r) {
+  const pts = []; const branches = 6;
+  const ringOuter = Math.floor(n*0.50);
+  for (let i = 0; i < ringOuter; i++) { const a=(i/ringOuter)*Math.PI*2; pts.push({x:Math.cos(a)*r,y:Math.sin(a)*r,z:0}); }
+  const branchTotal = Math.floor(n*0.30), perBranch = Math.floor(branchTotal/branches);
+  for (let b = 0; b < branches; b++) {
+    const a=(b/branches)*Math.PI*2;
+    for (let i = 0; i < perBranch; i++) { const t=0.4+(i/Math.max(1,perBranch-1))*0.55; pts.push({x:Math.cos(a)*r*t, y:Math.sin(a)*r*t, z:0}); }
+  }
+  const remaining = n-pts.length;
+  for (let i = 0; i < remaining; i++) { const a=(i/remaining)*Math.PI*2; pts.push({x:Math.cos(a)*r*0.4, y:Math.sin(a)*r*0.4, z:0}); }
+  return pts.slice(0, n);
+}
+
+function shapeAtom(n, r) {
+  const pts = []; const nucleusN = Math.floor(n*0.15), nR = r*0.18;
+  const golden = Math.PI*(3-Math.sqrt(5));
+  for (let i = 0; i < nucleusN; i++) { const y=1-(i/Math.max(1,nucleusN-1))*2, rad=Math.sqrt(1-y*y), theta=golden*i; pts.push({x:Math.cos(theta)*rad*nR, y:y*nR, z:Math.sin(theta)*rad*nR}); }
+  const orbR = r*0.98, remaining = n-pts.length, perOrbit = Math.floor(remaining/3);
+  for (let i = 0; i < perOrbit; i++) { const a=(i/perOrbit)*Math.PI*2; pts.push({x:Math.cos(a)*orbR, y:Math.sin(a)*orbR, z:0}); }
+  for (let i = 0; i < perOrbit; i++) { const a=(i/perOrbit)*Math.PI*2; pts.push({x:Math.cos(a)*orbR, y:0, z:Math.sin(a)*orbR}); }
+  while (pts.length < n) { const i=pts.length-2*perOrbit-nucleusN, a=(i/perOrbit)*Math.PI*2; pts.push({x:0, y:Math.cos(a)*orbR, z:Math.sin(a)*orbR}); }
+  return pts.slice(0, n);
+}
+
+function shapeHub(n, r) {
+  const pts = []; const outerN=40, innerN=20, spokes=5, spokeN=6;
+  for (let i=0;i<outerN;i++){const a=i/outerN*Math.PI*2;pts.push({x:Math.cos(a)*r,y:Math.sin(a)*r,z:0});}
+  for (let i=0;i<innerN;i++){const a=i/innerN*Math.PI*2;pts.push({x:Math.cos(a)*r*0.45,y:Math.sin(a)*r*0.45,z:0});}
+  for (let s=0;s<spokes;s++){const a=s/spokes*Math.PI*2;for(let i=1;i<=spokeN;i++){const t=i/(spokeN+1),rad=r*0.45+(r-r*0.45)*t;pts.push({x:Math.cos(a)*rad,y:Math.sin(a)*rad,z:0});}}
+  while(pts.length<n) pts.push({...pts[pts.length%outerN]});
+  return pts.slice(0,n);
+}
+
+function shapeTore(n, r) {
+  const pts=[], R=r*0.65, rad=r*0.32, U=18, V=Math.ceil(n/U);
+  for(let i=0;i<U;i++){const u=i/U*Math.PI*2;for(let j=0;j<V&&pts.length<n;j++){const v=j/V*Math.PI*2;pts.push({x:(R+rad*Math.cos(v))*Math.cos(u), y:(R+rad*Math.cos(v))*Math.sin(u), z:rad*Math.sin(v)});}}
+  while(pts.length<n) pts.push({...pts[0]});
+  return pts.slice(0,n);
+}
+
+function shapeText(text, n, w, h) {
+  const off = document.createElement('canvas');
+  off.width = w; off.height = h;
+  const octx = off.getContext('2d');
+  octx.fillStyle = '#fff';
+  octx.textAlign = 'center'; octx.textBaseline = 'middle';
+  let fontSize = h*0.65;
+  octx.font = `900 ${fontSize}px Orbitron, monospace`;
+  while (octx.measureText(text).width > w*0.95 && fontSize > 8) { fontSize-=2; octx.font=`900 ${fontSize}px Orbitron, monospace`; }
+  octx.fillText(text, w/2, h/2);
+  const data = octx.getImageData(0,0,w,h).data;
+  const opaque = [];
+  for (let py = 0; py < h; py+=2) for (let px = 0; px < w; px+=2) if (data[(py*w+px)*4+3]>128) opaque.push({x:px-w/2,y:py-h/2});
+  if (!opaque.length) return shapeSphere(n, Math.min(w,h)/3);
+  const pts = [];
+  for (let i = 0; i < n; i++) { const p=opaque[Math.floor(Math.random()*opaque.length)]; pts.push({x:p.x,y:p.y,z:(Math.random()-0.5)*8}); }
+  return pts;
+}
+
+function shapeFace(n, r) {
+  const pts = [];
+  const golden = Math.PI*(3-Math.sqrt(5));
+  const headN = Math.floor(n*0.76);
+  for(let i=0;i<headN;i++){
+    const yRaw = -1 + (i/(headN-1))*2;
+    const yNorm = (yRaw+1)/2;
+    let wScale;
+    if(yNorm<0.12)      wScale=0.28+yNorm*4.2;
+    else if(yNorm<0.32) wScale=0.88;
+    else if(yNorm<0.55) wScale=1.0;
+    else if(yNorm<0.78) wScale=0.48+yNorm*0.8;
+    else                wScale=0.28+(1-yNorm)*1.5;
+    const rad=Math.sqrt(Math.max(0,1-yRaw*yRaw))*wScale;
+    const theta=golden*i;
+    pts.push({x:Math.cos(theta)*rad*r*0.74, y:yRaw*r*0.96, z:Math.sin(theta)*rad*r*0.25});
+  }
+  const eyeY=-r*0.08, eyeX=r*0.28, eyeZ=r*0.26, eyeN=Math.floor(n*0.08);
+  for(let i=0;i<eyeN/2;i++){const a=i/(eyeN/2)*Math.PI*2,er=r*0.055;pts.push({x:-eyeX+Math.cos(a)*er*0.5, y:eyeY+Math.sin(a)*er*0.3, z:eyeZ});}
+  for(let i=0;i<eyeN/2;i++){const a=i/(eyeN/2)*Math.PI*2,er=r*0.055;pts.push({x:eyeX+Math.cos(a)*er*0.5, y:eyeY+Math.sin(a)*er*0.3, z:eyeZ});}
+  const noseN=Math.floor(n*0.04);
+  for(let i=0;i<noseN;i++){const t=i/noseN;pts.push({x:(Math.random()-0.5)*r*0.08, y:r*0.05+t*r*0.16, z:r*0.26+t*r*0.04});}
+  const mouthN=Math.floor(n*0.05);
+  for(let i=0;i<mouthN;i++){const t=i/mouthN,a=Math.PI*0.22+t*Math.PI*0.56;pts.push({x:Math.cos(a)*r*0.22, y:r*0.28+Math.sin(a)*r*0.05, z:r*0.2});}
+  while(pts.length<n) pts.push({...pts[Math.floor(Math.random()*headN)]});
+  return pts.slice(0,n);
+}
+
+const SHAPES = ['sphere','star','cube','arcreactor','atom','hub','tore','face','letterO','orion'];
+const SHAPE_LABELS = {
+  sphere:'SPHÈRE', star:'ÉTOILE', cube:'CUBE', arcreactor:'ARC REACTOR',
+  atom:'ATOME', hub:'HUB NEURONAL', tore:'TORE', face:'VISAGE IA',
+  letterO:'LETTRE O', orion:'ORION',
+};
+let shapeIdx = 0;
+let isFlatShape = false;
+
+function shapeForName(name) {
+  switch(name) {
+    case 'sphere':     return shapeSphere(N_PARTICLES, RADIUS);
+    case 'star':       return shapeStar(N_PARTICLES, RADIUS*1.05);
+    case 'cube':       return shapeCube(N_PARTICLES, RADIUS);
+    case 'arcreactor': return shapeArcReactor(N_PARTICLES, RADIUS);
+    case 'atom':       return shapeAtom(N_PARTICLES, RADIUS);
+    case 'hub':        return shapeHub(N_PARTICLES, RADIUS);
+    case 'tore':       return shapeTore(N_PARTICLES, RADIUS);
+    case 'face':       return shapeFace(N_PARTICLES, RADIUS);
+    case 'letterO':    return shapeText('O', N_PARTICLES, 300, 300);
+    case 'orion':      return shapeText('ORION', N_PARTICLES, 340, 120);
+    default:           return shapeSphere(N_PARTICLES, RADIUS);
+  }
+}
+
+// Particules : x,y,z = position courante ; tx,ty,tz = cible (morph vers cette position)
+let particles = shapeSphere(N_PARTICLES, RADIUS).map(p => ({...p, tx:p.x, ty:p.y, tz:p.z}));
+
+function setShape(name) {
+  const target = shapeForName(name);
+  // Matching greedy : chaque particule prend la cible la plus proche (transition naturelle)
+  const used = new Array(target.length).fill(false);
+  for (let i = 0; i < particles.length; i++) {
+    let bestJ = -1, bestD = Infinity;
+    for (let j = 0; j < target.length; j++) {
+      if (used[j]) continue;
+      const dx = particles[i].x - target[j].x;
+      const dy = particles[i].y - target[j].y;
+      const dz = particles[i].z - target[j].z;
+      const d = dx*dx + dy*dy + dz*dz;
+      if (d < bestD) { bestD = d; bestJ = j; }
+    }
+    if (bestJ >= 0) {
+      used[bestJ] = true;
+      particles[i].tx = target[bestJ].x;
+      particles[i].ty = target[bestJ].y;
+      particles[i].tz = target[bestJ].z;
+    }
+  }
+  isFlatShape = ['arcreactor','hub','letterO','orion'].includes(name);
+  const indicator = document.querySelector('.hud-readout.bot-right .hud-val');
+  if (indicator) indicator.textContent = SHAPE_LABELS[name] || name.toUpperCase();
+}
+
+// Cycle automatique des formes toutes les 7 secondes
+setInterval(() => {
+  shapeIdx = (shapeIdx + 1) % SHAPES.length;
+  setShape(SHAPES[shapeIdx]);
+}, 7000);
+
+function project(p) {
+  const cosY = Math.cos(rotY), sinY = Math.sin(rotY);
+  const cosX = Math.cos(rotX), sinX = Math.sin(rotX);
+  let x = p.x*cosY - p.z*sinY;
+  let z = p.x*sinY + p.z*cosY;
+  let y = p.y*cosX - z*sinX;
+  z = p.y*sinX + z*cosX;
+  const persp = 380 / (380 + z);
+  return { x: CX + x*persp, y: CY + y*persp, z, alpha: persp };
+}
+
+function drawSphere() {
+  ctx.clearRect(0, 0, W, H);
+  const t = frame * 0.013;
+
+  // Vitesse de rotation : forme plate = arrêt rotation, sinon dépend de l'état
+  const speed = isFlatShape ? 0
+              : sphereState==='processing' ? 0.018
+              : sphereState==='listening'  ? 0.010
+              : sphereState==='speaking'   ? 0.014
+              : 0.005;
+  rotY += speed;
+  rotX = isFlatShape ? 0 : Math.sin(t * 0.5) * 0.3;
+
+  // Pulse
+  let pulse = 1;
+  if (sphereState==='listening')  pulse = 1 + audioLevel*0.4 + Math.sin(t*5)*0.03;
+  else if (sphereState==='speaking') pulse = 1 + Math.abs(Math.sin(t*9))*0.18 + Math.sin(t*14)*0.04;
+  else if (sphereState==='processing') pulse = 1 + Math.sin(t*4)*0.05;
+
+  // Interpolation vers la cible (morphing fluide)
+  const lerp = 0.06;
+  for (const p of particles) {
+    p.x += (p.tx - p.x) * lerp;
+    p.y += (p.ty - p.y) * lerp;
+    p.z += (p.tz - p.z) * lerp;
+  }
+
+  // Application du pulse + projection
+  const projected = particles.map(p => project({
+    x: p.x*pulse, y: p.y*pulse, z: p.z*pulse,
+  }));
+
+  // Couleur selon état
+  const color =
+    sphereState==='listening'  ? [255, 59, 92] :
+    sphereState==='processing' ? [245, 197, 24] :
+    sphereState==='speaking'   ? [0, 255, 163] :
+    [0, 229, 255];
+
+  // Liens
+  ctx.lineWidth = 1;
+  for (let i = 0; i < projected.length; i++) {
+    for (let j = i+1; j < projected.length; j++) {
+      const a = projected[i], b = projected[j];
+      const dx = a.x-b.x, dy = a.y-b.y;
+      const d = Math.sqrt(dx*dx + dy*dy);
+      if (d < CONNECT_DIST) {
+        const opacity = (1 - d/CONNECT_DIST) * 0.25 * Math.min(a.alpha, b.alpha);
+        ctx.strokeStyle = `rgba(${color[0]},${color[1]},${color[2]},${opacity})`;
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+      }
+    }
+  }
+
+  // Points
+  for (const p of projected) {
+    const size = 1.5 + p.alpha * 2;
+    const op = Math.min(1, p.alpha * 1.2);
+    ctx.fillStyle = `rgba(${color[0]},${color[1]},${color[2]},${op})`;
+    ctx.shadowColor = `rgba(${color[0]},${color[1]},${color[2]},0.8)`;
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, size, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.shadowBlur = 0;
+
+  frame++;
+  requestAnimationFrame(drawSphere);
+}
+drawSphere();
+
+/* ═══════════════════════════════════════════════
+   ÉTATS
+════════════════════════════════════════════════ */
+const STATE_LABELS = {
+  idle:      'STANDBY',
+  listening: 'ÉCOUTE',
+  processing:'TRAITEMENT',
+  speaking:  'PARLE',
+};
+const STATE_CLASSES = {
+  idle:'',
+  listening:'state--listening',
+  processing:'state--processing',
+  speaking:'state--speaking',
+};
+function setState(s) {
+  sphereState = s;
+  document.getElementById('sphereStateText').textContent = STATE_LABELS[s] || s.toUpperCase();
+  const panel = document.getElementById('voicePanel');
+  panel.className = 'voice-panel ' + (STATE_CLASSES[s] || '');
+}
+
+/* ═══════════════════════════════════════════════
+   TOAST + TRANSCRIPT
+════════════════════════════════════════════════ */
+let toastTimeout = null;
+function toast(msg, isError=false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isError ? ' error' : '');
+  if (toastTimeout) clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => t.className = 'toast', 4000);
+}
+
+function setUserText(text) {
+  const el = document.getElementById('txUser');
+  if (text) { el.textContent = text; el.style.display = 'block'; }
+  else el.style.display = 'none';
+}
+function setOrionText(text) {
+  document.getElementById('txOrion').textContent = text;
+}
+function setToolHint(text) {
+  const el = document.getElementById('txTool');
+  if (text) { el.textContent = text; el.style.display = 'block'; }
+  else el.style.display = 'none';
+}
+
+/* ═══════════════════════════════════════════════
+   AUDIO ANALYSIS + SILENCE DETECT
+════════════════════════════════════════════════ */
+let audioCtx = null, audioAnalyser = null, audioRafId = null, audioSourceNode = null;
+let silenceStart = null, hasSpeech = false;
+let audioLevel = 0;
+
+function startAudioAnalysis(stream, onSilence) {
+  audioLevel = 0.18;
+  if (!stream) return;
+  try {
+    audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    audioSourceNode = audioCtx.createMediaStreamSource(stream);
+    audioAnalyser = audioCtx.createAnalyser();
+    audioAnalyser.fftSize = 256;
+    audioSourceNode.connect(audioAnalyser);
+    const buf = new Uint8Array(audioAnalyser.frequencyBinCount);
+    silenceStart = null; hasSpeech = false;
+    const loop = () => {
+      if (!audioAnalyser) return;
+      audioAnalyser.getByteTimeDomainData(buf);
+      let max = 0;
+      for (let i = 0; i < buf.length; i++) {
+        const v = Math.abs(buf[i] - 128);
+        if (v > max) max = v;
+      }
+      audioLevel = Math.min(1, max / 64);
+      // Sync barre VOICE
+      const pct = Math.round(audioLevel * 100);
+      document.getElementById('efVoice').style.width = pct + '%';
+      document.getElementById('evVoice').textContent = pct + '%';
+      // Silence detect
+      if (max > 12) { silenceStart = null; hasSpeech = true; }
+      else if (hasSpeech) {
+        if (silenceStart === null) silenceStart = performance.now();
+        else if (performance.now() - silenceStart > 1400 && onSilence) {
+          onSilence(); return;
+        }
+      }
+      audioRafId = requestAnimationFrame(loop);
+    };
+    loop();
+  } catch (e) { console.warn('[audio]', e); }
+}
+function stopAudioAnalysis() {
+  audioLevel = 0;
+  if (audioRafId) { cancelAnimationFrame(audioRafId); audioRafId = null; }
+  try { audioSourceNode?.disconnect(); } catch(e) {}
+  try { audioAnalyser?.disconnect(); } catch(e) {}
+  try { audioCtx?.close(); } catch(e) {}
+  audioCtx = null; audioAnalyser = null; audioSourceNode = null;
+  silenceStart = null; hasSpeech = false;
+  document.getElementById('efVoice').style.width = '0%';
+  document.getElementById('evVoice').textContent = '0%';
+}
+
+/* ═══════════════════════════════════════════════
+   MICRO : MediaRecorder → /api/transcribe
+════════════════════════════════════════════════ */
+let isListening = false;
+let mediaRecorder = null, mediaStream = null;
+let audioChunks = [];
+let recordTimeoutId = null;
+const MAX_RECORD_MS = 20000;
+
+function pickAudioMime() {
+  const cands = ['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/mp4'];
+  for (const m of cands) if (window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return m;
+  return '';
+}
+
+function toggleMic() {
+  isListening ? stopListening() : startListening();
+}
+
+async function startListening() {
+  if (isListening) return;
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    toast('Pas connecté au serveur. Vérifie la config.', true);
+    return;
+  }
+  if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+    toast('Capture audio non supportée par ce navigateur.', true);
+    return;
+  }
+  if (window.speechSynthesis?.speaking || window.speechSynthesis?.pending) {
+    window.speechSynthesis.cancel();
+  }
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 16000 },
+    });
+  } catch (err) {
+    toast('Accès micro refusé : ' + err.message, true);
+    return;
+  }
+  const mime = pickAudioMime();
+  try {
+    mediaRecorder = mime ? new MediaRecorder(mediaStream, { mimeType: mime })
+                         : new MediaRecorder(mediaStream);
+  } catch (err) {
+    toast('MediaRecorder : ' + err.message, true);
+    mediaStream.getTracks().forEach(t => t.stop());
+    return;
+  }
+  audioChunks = [];
+  mediaRecorder.ondataavailable = e => { if (e.data?.size) audioChunks.push(e.data); };
+  mediaRecorder.onstop = async () => {
+    const blob = audioChunks.length
+      ? new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' })
+      : null;
+    audioChunks = [];
+    mediaStream?.getTracks().forEach(t => t.stop());
+    mediaStream = null; mediaRecorder = null;
+    isListening = false;
+    document.getElementById('micBtn').classList.remove('listening');
+    document.getElementById('micHint').textContent = 'Appuie ou clique pour parler';
+    stopAudioAnalysis();
+    if (recordTimeoutId) { clearTimeout(recordTimeoutId); recordTimeoutId = null; }
+    if (!blob || blob.size < 500) {
+      toast('Trop court ou silence.', true);
+      setState('idle'); return;
+    }
+    await uploadAudio(blob);
+  };
+
+  isListening = true;
+  setState('listening');
+  document.getElementById('micBtn').classList.add('listening');
+  document.getElementById('micHint').textContent = "J'écoute…";
+  setUserText(''); setToolHint(''); setOrionText("Je t'écoute.");
+  startAudioAnalysis(mediaStream, () => {
+    if (mediaRecorder?.state === 'recording') mediaRecorder.stop();
+  });
+  recordTimeoutId = setTimeout(() => {
+    if (mediaRecorder?.state === 'recording') mediaRecorder.stop();
+  }, MAX_RECORD_MS);
+  mediaRecorder.start();
+}
+
+function stopListening() {
+  if (mediaRecorder?.state === 'recording') mediaRecorder.stop();
+}
+
+async function uploadAudio(blob) {
+  setState('processing');
+  setOrionText('Transcription…');
+  const url = (document.getElementById('cfgUrl').value.trim().replace(/^ws/, 'http'))
+              + '/api/transcribe?token='
+              + encodeURIComponent(document.getElementById('cfgToken').value.trim())
+              + '&language=fr';
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': blob.type || 'audio/webm' },
+      body: blob,
+    });
+    if (!resp.ok) {
+      toast('HTTP ' + resp.status, true);
+      setState('idle'); setOrionText('Erreur transcription.'); return;
+    }
+    const data = await resp.json();
+    if (!data.success || !data.text?.trim()) {
+      toast(data.error || "Je n'ai rien compris.", true);
+      setState('idle'); setOrionText("Je n'ai rien compris."); return;
+    }
+    const text = data.text.trim();
+    setUserText(text);
+    sendToOrion(text);
+  } catch (err) {
+    toast('Échec : ' + err.message, true);
+    setState('idle'); setOrionText('Erreur réseau.');
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   WEBSOCKET vers Orion
+════════════════════════════════════════════════ */
+let ws = null;
+function connect() {
+  const url    = document.getElementById('cfgUrl').value.trim();
+  const token  = document.getElementById('cfgToken').value.trim();
+  const device = document.getElementById('cfgDevice').value.trim() || 'voice-browser';
+  if (!token) { toast('Token serveur requis.', true); return; }
+  if (ws) ws.close();
+  ws = new WebSocket(`${url}/ws/${device}?token=${token}`);
+  ws.onopen = () => {
+    setConn(true);
+    toggleConfig(false);
+    toast('Connecté.');
+  };
+  ws.onmessage = e => {
+    const data = JSON.parse(e.data);
+    if (data.type === 'connected') return;
+    if (data.type === 'tool_action') {
+      const ok = data.result?.success !== false ? '✓' : '✗';
+      setToolHint(`${ok} ${data.tool}`);
+    } else if (data.type === 'response_chunk') {
+      handleResponseChunk(data.text || '');
+    } else if (data.type === 'response') {
+      finishStreamingResponse(data.content || '');
+    } else if (data.type === 'error') {
+      setState('idle');
+      setOrionText('Erreur : ' + (data.content || 'inconnue'));
+      toast(data.content || 'erreur', true);
+    } else if (data.type === 'info') {
+      toast(data.message || '');
+    } else if (data.type === 'confirm_request') {
+      showConfirmModal(data);
+    } else if (data.type === 'confirm_result') {
+      onConfirmResult(data);
+    } else if (data.type === 'audit_alert') {
+      // Toast simple (réutilise le système toast existant)
+      const ok = data.success ? '✓' : '✗';
+      const conf = data.confirmed ? ' [conf]' : '';
+      toast(`${ok}${conf} ${data.tool_name} · ${data.device_id || '?'}`,
+            !data.success);
+    }
+  };
+  ws.onclose = () => { setConn(false); setState('idle'); };
+  ws.onerror = () => { setConn(false); toast('Erreur WebSocket.', true); };
+}
+function disconnect() { if (ws) { ws.close(); ws = null; } }
+
+/* ═══════════════════════════════════════════════
+   CONFIRMATION PAR MOT DE PASSE (actions sensibles)
+════════════════════════════════════════════════ */
+let pendingConfirmId = null;
+let confirmTimerInt = null;
+
+function showConfirmModal(data) {
+  pendingConfirmId = data.request_id;
+  document.getElementById('confirmReason').textContent = data.reason || 'Action sensible';
+  const detail = document.getElementById('confirmDetail');
+  detail.innerHTML = '';
+  const tool = document.createElement('b');
+  tool.textContent = data.tool || '';
+  detail.appendChild(tool);
+  detail.appendChild(document.createTextNode(' · '));
+  const preview = document.createTextNode(data.input_preview || '(sans paramètres visibles)');
+  detail.appendChild(preview);
+
+  document.getElementById('confirmError').textContent = '';
+  const pwdInput = document.getElementById('confirmPwd');
+  pwdInput.value = '';
+  document.getElementById('confirmOverlay').classList.add('show');
+  setTimeout(() => pwdInput.focus(), 50);
+
+  let remaining = data.timeout_sec || 120;
+  const timerEl = document.getElementById('confirmTimer');
+  timerEl.textContent = `Expire dans ${remaining}s — refus auto`;
+  if (confirmTimerInt) clearInterval(confirmTimerInt);
+  confirmTimerInt = setInterval(() => {
+    remaining--;
+    if (remaining <= 0) {
+      clearInterval(confirmTimerInt);
+      hideConfirmModal();
+    } else {
+      timerEl.textContent = `Expire dans ${remaining}s — refus auto`;
+    }
+  }, 1000);
+}
+
+function hideConfirmModal() {
+  document.getElementById('confirmOverlay').classList.remove('show');
+  pendingConfirmId = null;
+  if (confirmTimerInt) { clearInterval(confirmTimerInt); confirmTimerInt = null; }
+}
+
+function confirmApprove() {
+  if (!pendingConfirmId) return;
+  const pwd = document.getElementById('confirmPwd').value;
+  if (!pwd) {
+    document.getElementById('confirmError').textContent = 'Mot de passe requis.';
+    return;
+  }
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({
+      type: 'confirm_response',
+      request_id: pendingConfirmId,
+      password: pwd,
+    }));
+  }
+}
+
+function confirmDeny() {
+  if (!pendingConfirmId) { hideConfirmModal(); return; }
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({
+      type: 'confirm_response',
+      request_id: pendingConfirmId,
+      refused: true,
+    }));
+  }
+  hideConfirmModal();
+}
+
+function onConfirmResult(data) {
+  if (data.request_id !== pendingConfirmId) return;
+  if (data.accepted) {
+    hideConfirmModal();
+    toast('Action autorisée.');
+  } else {
+    document.getElementById('confirmError').textContent = data.error || 'Mot de passe incorrect.';
+    document.getElementById('confirmPwd').value = '';
+    document.getElementById('confirmPwd').focus();
+  }
+}
+
+document.addEventListener('keydown', (e) => {
+  if (!pendingConfirmId) return;
+  if (e.key === 'Enter')  { e.preventDefault(); confirmApprove(); }
+  if (e.key === 'Escape') { e.preventDefault(); confirmDeny(); }
+});
+
+function setConn(on) {
+  const pill = document.getElementById('connStatus');
+  pill.className = 'status-pill' + (on ? ' connected' : '');
+  document.getElementById('connText').textContent = on ? 'EN LIGNE' : 'HORS LIGNE';
+}
+
+function sendToOrion(text) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    toast('Pas connecté.', true);
+    setState('idle'); return;
+  }
+  setState('processing');
+  setOrionText('Réflexion…');
+  // Reset des accumulateurs de stream
+  streamAcc = '';
+  streamSpokenIdx = 0;
+  streamHadFirstChunk = false;
+  ws.send(JSON.stringify({ type: 'message', content: text }));
+}
+
+/* ═══════════════════════════════════════════════
+   STREAMING : affichage progressif + TTS dès qu'une phrase est complète
+════════════════════════════════════════════════ */
+let streamAcc = '';            // texte cumulé reçu jusqu'ici
+let streamSpokenIdx = 0;       // index jusqu'où on a déjà envoyé au TTS
+let streamHadFirstChunk = false;
+
+const SENTENCE_END_RE = /[.!?…]+(\s|$)/g;
+
+function handleResponseChunk(text) {
+  if (!text) return;
+  if (!streamHadFirstChunk) {
+    streamHadFirstChunk = true;
+    setState('speaking');
+    setToolHint('');
+  }
+  streamAcc += text;
+  setOrionText(streamAcc);
+  // Cherche les phrases complètes pas encore parlées et TTS-les immédiatement
+  const remaining = streamAcc.slice(streamSpokenIdx);
+  let lastBoundaryEnd = 0;
+  let m;
+  SENTENCE_END_RE.lastIndex = 0;
+  while ((m = SENTENCE_END_RE.exec(remaining)) !== null) {
+    lastBoundaryEnd = m.index + m[0].length;
+  }
+  if (lastBoundaryEnd > 0) {
+    const toSpeak = remaining.slice(0, lastBoundaryEnd).trim();
+    if (toSpeak.length >= 8) {  // évite de parler des fragments minuscules
+      speakAppend(toSpeak);
+      streamSpokenIdx += lastBoundaryEnd;
+    }
+  }
+}
+
+function finishStreamingResponse(fullContent) {
+  // Si pas de stream (provider sans support) ou si du texte reste après la dernière phrase
+  if (!streamHadFirstChunk && fullContent) {
+    setState('speaking');
+    setOrionText(fullContent);
+    speakAppend(fullContent);
+  } else {
+    // Streaming : on a peut-être un fragment final non encore parlé (sans ponctuation finale)
+    const tail = (fullContent || streamAcc).slice(streamSpokenIdx).trim();
+    if (tail) speakAppend(tail);
+    if (fullContent) setOrionText(fullContent);
+  }
+  // Reset pour le prochain tour
+  streamAcc = '';
+  streamSpokenIdx = 0;
+  streamHadFirstChunk = false;
+  // Retour à idle avec petite tempo (laisse le TTS finir)
+  setTimeout(() => { if (sphereState === 'speaking') setState('idle'); }, 500);
+}
+
+/* speakAppend = enchaîne plusieurs phrases dans speechSynthesis sans gap */
+function speakAppend(text) {
+  if (!window.speechSynthesis) return;
+  const clean = cleanForSpeech(text);
+  if (!clean) return;
+  const u = new SpeechSynthesisUtterance(clean);
+  const v = pickFrenchVoice();
+  if (v) u.voice = v;
+  u.lang = 'fr-FR';
+  u.rate = 1.05;
+  u.pitch = 1.0;
+  // Note : on n'appelle PAS cancel() pour permettre l'enchaînement
+  window.speechSynthesis.speak(u);
+}
+
+/* ═══════════════════════════════════════════════
+   TTS Web Speech API (cleanup texte)
+════════════════════════════════════════════════ */
+function cleanForSpeech(text) {
+  let t = text || '';
+  t = t.replace(/```[\s\S]*?```/g, ' ');
+  t = t.replace(/`([^`]+)`/g, '$1');
+  t = t.replace(/[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\u{2600}-\u{27BF}]/gu, ' ');
+  t = t.replace(/[*_#>]/g, '');
+  t = t.replace(/^\s*[-*+]\s+/gm, '');
+  t = t.replace(/^\s*\d+[.)]\s+/gm, '');
+  t = t.replace(/\n{2,}/g, '. ').replace(/\n/g, ' ');
+  t = t.replace(/\s+/g, ' ').trim();
+  return t;
+}
+function pickFrenchVoice() {
+  const voices = window.speechSynthesis?.getVoices() || [];
+  const fr = voices.filter(v => v.lang.toLowerCase().startsWith('fr'));
+  if (!fr.length) return null;
+  const pref = ['paul','thomas','henri','google français','microsoft paul'];
+  for (const p of pref) { const m = fr.find(v => v.name.toLowerCase().includes(p)); if (m) return m; }
+  return fr[0];
+}
+function speak(text) {
+  if (!window.speechSynthesis) return;
+  const clean = cleanForSpeech(text);
+  if (!clean) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(clean);
+  const v = pickFrenchVoice();
+  if (v) u.voice = v;
+  u.lang = 'fr-FR';
+  u.rate = 1.05;
+  u.pitch = 1.0;
+  u.onend = () => { if (sphereState === 'speaking') setState('idle'); };
+  window.speechSynthesis.speak(u);
+}
+
+/* ═══════════════════════════════════════════════
+   CONFIG PANEL
+════════════════════════════════════════════════ */
+function toggleConfig(force) {
+  const panel = document.getElementById('configPanel');
+  if (force === false) panel.classList.remove('show');
+  else if (force === true) panel.classList.add('show');
+  else panel.classList.toggle('show');
+}
+
+/* ═══════════════════════════════════════════════
+   RACCOURCIS CLAVIER : SPACE = parler / Échap = stop
+════════════════════════════════════════════════ */
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.code === 'Space') { e.preventDefault(); toggleMic(); }
+  else if (e.code === 'Escape') { stopListening(); }
+});
+
+/* Auto-focus + tente d'auto-connecter si token déjà présent dans le storage */
+window.addEventListener('load', () => {
+  const savedToken = localStorage.getItem('orionVoiceToken');
+  if (savedToken) document.getElementById('cfgToken').value = savedToken;
+  // Persiste le token quand l'utilisateur le change
+  document.getElementById('cfgToken').addEventListener('change', e => {
+    if (e.target.value) localStorage.setItem('orionVoiceToken', e.target.value);
+  });
+  // Auto-connect si on a un token
+  if (savedToken) setTimeout(connect, 200);
+});
+
+/* Pré-charge les voix TTS */
+window.speechSynthesis?.getVoices();
+window.speechSynthesis?.addEventListener?.('voiceschanged', () => {});
+</script>
+
+</body>
+</html>

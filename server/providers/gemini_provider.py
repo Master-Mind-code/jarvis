@@ -112,17 +112,18 @@ class GeminiProvider(Provider):
 
         return contents
 
-    def call(self, system: str, tools: list, messages: list, max_tokens: int = 4096) -> ProviderResponse:
+    def _build_config(self, system: str, tools: list, max_tokens: int):
         types = self._types
-        gemini_tools = self._convert_tools(tools)
-        gemini_messages = self._convert_messages(messages)
-
-        config = types.GenerateContentConfig(
+        return types.GenerateContentConfig(
             system_instruction=system,
-            tools=gemini_tools,
+            tools=self._convert_tools(tools),
             max_output_tokens=max_tokens,
             temperature=0.7,
         )
+
+    def call(self, system: str, tools: list, messages: list, max_tokens: int = 4096) -> ProviderResponse:
+        gemini_messages = self._convert_messages(messages)
+        config = self._build_config(system, tools, max_tokens)
 
         response = self.client.models.generate_content(
             model=self.model,
@@ -149,3 +150,42 @@ class GeminiProvider(Provider):
         has_tool_use = any(b["type"] == "tool_use" for b in content)
         stop_reason = "tool_use" if has_tool_use else "end_turn"
         return ProviderResponse(content=content, stop_reason=stop_reason)
+
+    def stream(self, system: str, tools: list, messages: list, max_tokens: int = 4096):
+        """Streaming Gemini via generate_content_stream."""
+        gemini_messages = self._convert_messages(messages)
+        config = self._build_config(system, tools, max_tokens)
+
+        accumulated_text: list[str] = []
+        tool_calls: list[dict] = []
+
+        for chunk in self.client.models.generate_content_stream(
+            model=self.model,
+            contents=gemini_messages,
+            config=config,
+        ):
+            if not chunk.candidates:
+                continue
+            parts = chunk.candidates[0].content.parts or []
+            for part in parts:
+                if getattr(part, "text", None):
+                    accumulated_text.append(part.text)
+                    yield {"type": "text_delta", "text": part.text}
+                fc = getattr(part, "function_call", None)
+                if fc and getattr(fc, "name", None):
+                    args = _to_jsonable(fc.args) if fc.args else {}
+                    tool_calls.append({
+                        "type": "tool_use",
+                        "id": f"toolu_{uuid.uuid4().hex[:12]}",
+                        "name": fc.name,
+                        "input": args if isinstance(args, dict) else {"value": args},
+                    })
+
+        content = []
+        full_text = "".join(accumulated_text).strip()
+        if full_text:
+            content.append({"type": "text", "text": full_text})
+        content.extend(tool_calls)
+
+        stop_reason = "tool_use" if tool_calls else "end_turn"
+        yield {"type": "done", "response": ProviderResponse(content=content, stop_reason=stop_reason)}

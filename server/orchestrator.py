@@ -17,7 +17,12 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 sync_env_aliases()
 
 from server.tools import ALL_HANDLERS
-from server.providers import get_provider
+from server.providers import get_provider, ProviderResponse
+from server import confirm
+from server import audit
+from server import safety_backup
+from server import rate_limit
+from server import panic
 
 # Provider initialisé en lazy : on ne crée le client qu'au premier appel,
 # pour permettre à l'orchestrateur de s'importer même si la clé du provider sélectionné
@@ -605,6 +610,95 @@ TOOLS = [
             "properties": {"on": {"type": "boolean", "default": True}},
         },
     },
+    # ─── Backups (récupération si Orion supprime/écrase) ──────
+    {
+        "name": "list_backups",
+        "description": "Liste les sauvegardes automatiques créées avant chaque "
+                       "delete_file/move_file. Permet de retrouver et restaurer.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "hours": {"type": "number", "description": "Fenêtre temporelle", "default": 24},
+                "limit": {"type": "integer", "description": "Max d'entrées", "default": 50},
+            },
+        },
+    },
+    {
+        "name": "restore_backup",
+        "description": "Restaure une sauvegarde. Sans target → restaure à l'emplacement original.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "backup_path": {"type": "string", "description": "Chemin du .bak (obtenu via list_backups)"},
+                "target":      {"type": "string", "description": "Cible alternative (optionnel)"},
+                "overwrite":   {"type": "boolean", "description": "Écraser la cible existante", "default": False},
+            },
+            "required": ["backup_path"],
+        },
+    },
+    {
+        "name": "purge_backups",
+        "description": "Supprime les backups plus vieux que N jours. DESTRUCTIF, demande confirm.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "older_than_days": {"type": "integer", "default": 30},
+                "confirm":         {"type": "boolean", "default": False},
+            },
+        },
+    },
+    # ─── Audit log (consultation des actions passées) ─────────
+    {
+        "name": "audit_recent",
+        "description": "Liste les actions récentes exécutées par Orion (audit log). "
+                       "Utilise pour répondre à 'qu'est-ce que tu as fait ?', "
+                       "'liste les actions sensibles', 'erreurs récentes'. "
+                       "Retourne timestamp, device, tool, succès, durée.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "limit":  {"type": "integer", "description": "Nombre max d'entrées (1-100)", "default": 20},
+                "hours":  {"type": "number",  "description": "Fenêtre temporelle en heures", "default": 24},
+                "sensitive_only": {"type": "boolean", "description": "Filtrer sur actions sensibles uniquement", "default": False},
+                "failed_only":    {"type": "boolean", "description": "Filtrer sur échecs uniquement", "default": False},
+            },
+        },
+    },
+    {
+        "name": "audit_stats",
+        "description": "Statistiques agrégées de l'audit log : total, succès, échecs, "
+                       "actions sensibles, top 5 des tools les plus utilisés.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "hours": {"type": "number", "description": "Fenêtre temporelle en heures", "default": 24},
+            },
+        },
+    },
+    # ─── Vision (analyse d'image) ─────────────────────────────
+    {
+        "name": "analyze_image",
+        "description": "Analyse une image (PNG, JPG, etc.) et retourne une description textuelle. "
+                       "Utilise Claude/Gemini Vision. Combine avec screenshot pour 'regarde mon écran et dis-moi…'. "
+                       "Idéal pour : décrire une photo, lire le texte d'une capture, analyser un graphique, "
+                       "comprendre une erreur visible à l'écran.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "Chemin de l'image (PNG, JPG, GIF, WebP, BMP)"},
+                "prompt": {
+                    "type": "string",
+                    "description": "Question ou consigne sur l'image (ex: 'lis le texte', 'décris', 'que voit-on ?')",
+                    "default": "Décris cette image en détail.",
+                },
+                "provider": {
+                    "type": "string",
+                    "description": "anthropic | gemini | ollama (défaut: provider Orion courant)",
+                },
+            },
+            "required": ["path"],
+        },
+    },
 ]
 
 # Tools qui interagissent avec le matériel/OS et acceptent un target_device.
@@ -686,7 +780,8 @@ def _build_system_prompt(device_id: str | None = None) -> str:
 # ─────────────────────────────────────────────────────────────────
 # Moteur d'exécution
 # ─────────────────────────────────────────────────────────────────
-def execute_tool(tool_name: str, tool_input: dict, dispatcher=None, list_devices=None) -> str:
+def execute_tool(tool_name: str, tool_input: dict, dispatcher=None,
+                 list_devices=None, device_id: str | None = None) -> str:
     """Exécute un tool et retourne le résultat en JSON string.
 
     Args:
@@ -695,8 +790,10 @@ def execute_tool(tool_name: str, tool_input: dict, dispatcher=None, list_devices
         dispatcher: Callback (device_id, tool_name, tool_input) -> result_str
                     pour exécution sur un appareil distant.
         list_devices: Callback () -> list[dict] pour le tool list_connected_devices.
+        device_id:  Identifiant du client appelant (sert pour la confirmation
+                    par mot de passe et l'audit log).
     """
-    # Cas spécial : tool de listing géré côté serveur
+    # Cas spécial : tool de listing géré côté serveur (pas de log intéressant)
     if tool_name == "list_connected_devices":
         if list_devices is None:
             return json.dumps({"success": True, "devices": [], "message": "Mode standalone : aucun appareil distant."})
@@ -706,22 +803,116 @@ def execute_tool(tool_name: str, tool_input: dict, dispatcher=None, list_devices
     tool_input = dict(tool_input)  # copie défensive
     target = tool_input.pop("target_device", None)
 
-    if target and target not in ("", "server", "local") and dispatcher is not None:
-        # Exécution distante via le dispatcher (worker WebSocket)
-        try:
-            return dispatcher(target, tool_name, tool_input)
-        except Exception as e:
-            return json.dumps({"success": False, "error": f"Dispatch vers '{target}' a échoué : {e}"})
+    import time as _time
+    is_sensitive = confirm.requires_confirmation(tool_name, tool_input)
+    confirmed = False
 
-    # Exécution locale
-    handler = ALL_HANDLERS.get(tool_name)
-    if not handler:
-        return json.dumps({"success": False, "error": f"Tool inconnu : {tool_name}"})
+    # ── Mode PANIC : refus tout sauf whitelist lecture ──
+    if not panic.is_tool_allowed(tool_name):
+        err = (f"Mode PANIC actif — '{tool_name}' refusé. "
+               f"Désactive avec POST /api/panic/release pour rétablir.")
+        row_id = audit.log_tool_call(
+            device_id=device_id or "?", tool_name=tool_name,
+            tool_input=tool_input, success=False, error=err,
+            duration_ms=0, target=target, sensitive=True, confirmed=False,
+        )
+        audit._trigger_alert(row_id, True,
+                             tool_name=tool_name, device_id=device_id,
+                             success=False, error=err, confirmed=False)
+        return json.dumps({"success": False, "error": err}, ensure_ascii=False)
+
+    # ── Rate limit sur tools sensibles (anti-abus) ──
+    if device_id and is_sensitive:
+        ok, reason = rate_limit.check_and_record(device_id)
+        if not ok:
+            row_id = audit.log_tool_call(
+                device_id=device_id, tool_name=tool_name,
+                tool_input=tool_input, success=False, error=reason,
+                duration_ms=0, target=target, sensitive=True, confirmed=False,
+            )
+            audit._trigger_alert(row_id, True,
+                                 tool_name=tool_name, device_id=device_id,
+                                 success=False, error=reason, confirmed=False)
+            return json.dumps({"success": False, "error": reason}, ensure_ascii=False)
+
+    # ── Couche de confirmation pour actions dangereuses ──
+    if device_id and is_sensitive:
+        approved = confirm.request_confirmation(
+            device_id=device_id,
+            tool_name=tool_name,
+            tool_input=tool_input,
+            reason=confirm.reason_for(tool_name),
+        )
+        if not approved:
+            err = (f"Action '{tool_name}' refusée par l'utilisateur "
+                   f"(confirmation par mot de passe requise).")
+            row_id = audit.log_tool_call(
+                device_id=device_id or "?", tool_name=tool_name,
+                tool_input=tool_input, success=False, error=err,
+                duration_ms=0, target=target, sensitive=True, confirmed=False,
+            )
+            audit._trigger_alert(row_id, True,
+                                 tool_name=tool_name, device_id=device_id,
+                                 success=False, error=err, confirmed=False)
+            return json.dumps({"success": False, "error": err}, ensure_ascii=False)
+        confirmed = True
+
+    # ── Backup auto avant action destructive locale ──
+    # (skip si exécution distante : trop coûteux à transférer)
+    if (not target or target in ("", "server", "local")):
+        try:
+            if tool_name == "delete_file":
+                src = tool_input.get("path")
+                if src:
+                    safety_backup.backup_file_or_dir(src)
+            elif tool_name == "move_file" and tool_input.get("dst"):
+                # Si la destination existe → backup avant écrasement
+                from pathlib import Path as _P
+                dst = _P(tool_input["dst"]).expanduser()
+                if dst.exists():
+                    safety_backup.backup_file_or_dir(str(dst))
+        except Exception as exc:
+            print(f"[backup!] {exc}")
+
+    # ── Exécution distante via worker ──
+    t0 = _time.time()
+    if target and target not in ("", "server", "local") and dispatcher is not None:
+        try:
+            result_str = dispatcher(target, tool_name, tool_input)
+        except Exception as e:
+            result_str = json.dumps({"success": False, "error": f"Dispatch vers '{target}' a échoué : {e}"})
+    else:
+        # Exécution locale
+        handler = ALL_HANDLERS.get(tool_name)
+        if not handler:
+            result_str = json.dumps({"success": False, "error": f"Tool inconnu : {tool_name}"})
+        else:
+            try:
+                result = handler(tool_input)
+                result_str = json.dumps(result, ensure_ascii=False)
+            except Exception as e:
+                result_str = json.dumps({"success": False, "error": str(e)})
+    duration_ms = int((_time.time() - t0) * 1000)
+
+    # ── Log audit (best-effort, n'interrompt jamais le flow) ──
     try:
-        result = handler(tool_input)
-        return json.dumps(result, ensure_ascii=False)
-    except Exception as e:
-        return json.dumps({"success": False, "error": str(e)})
+        result_obj = json.loads(result_str) if isinstance(result_str, str) else result_str
+        success = bool(result_obj.get("success", True))
+        error = (result_obj.get("error") or "")[:300]
+    except Exception:
+        success, error = True, ""
+    row_id = audit.log_tool_call(
+        device_id=device_id or "?", tool_name=tool_name,
+        tool_input=tool_input, success=success, error=error,
+        duration_ms=duration_ms, target=target,
+        sensitive=is_sensitive, confirmed=confirmed,
+    )
+    audit._trigger_alert(row_id, is_sensitive,
+                         tool_name=tool_name, device_id=device_id,
+                         success=success, error=error,
+                         confirmed=confirmed, duration_ms=duration_ms,
+                         target=target)
+    return result_str
 
 
 def process_request(
@@ -780,6 +971,7 @@ def process_request(
             result = execute_tool(
                 tool_block["name"], tool_block["input"],
                 dispatcher=dispatcher, list_devices=list_devices,
+                device_id=device_id,
             )
             if on_tool_call:
                 on_tool_call(tool_block["name"], tool_block["input"], result)
@@ -789,6 +981,86 @@ def process_request(
                 "content": result,
             })
 
+        conversation_history.append({"role": "user", "content": tool_results})
+
+    if not final_response:
+        final_response = f"[Limite de {MAX_ITERATIONS} itérations atteinte]"
+    return final_response, conversation_history
+
+
+def process_request_streaming(
+    user_message: str,
+    conversation_history: list = None,
+    on_text_delta=None,         # Callback(str) appelé pour chaque fragment de texte
+    on_tool_call=None,          # Callback(name, input, result) après exécution d'un tool
+    dispatcher=None,
+    list_devices=None,
+    device_id: str | None = None,
+) -> tuple[str, list]:
+    """
+    Version streamée de process_request : appelle on_text_delta(fragment) en temps réel.
+
+    Idéal pour réduire la latence perçue côté UI/voix : la réponse commence à
+    s'afficher dès le premier token généré par le LLM, au lieu d'attendre la fin.
+
+    Returns:
+        (réponse_finale_complète, historique_mis_à_jour)
+    """
+    if conversation_history is None:
+        conversation_history = []
+
+    conversation_history.append({"role": "user", "content": user_message})
+
+    final_response = ""
+    provider = _get_provider()
+    system_prompt = _build_system_prompt(device_id)
+
+    for _ in range(MAX_ITERATIONS):
+        response: ProviderResponse | None = None
+        for chunk in provider.stream(
+            system=system_prompt,
+            tools=TOOLS,
+            messages=conversation_history,
+            max_tokens=4096,
+        ):
+            ctype = chunk.get("type")
+            if ctype == "text_delta":
+                text = chunk.get("text") or ""
+                if text and on_text_delta:
+                    try:
+                        on_text_delta(text)
+                    except Exception:
+                        pass
+            elif ctype == "done":
+                response = chunk.get("response")
+
+        if response is None:
+            break
+
+        tool_uses = [b for b in response.content if b.get("type") == "tool_use"]
+        text_parts = [b["text"] for b in response.content if b.get("type") == "text"]
+        if text_parts:
+            final_response = "\n".join(text_parts)
+
+        conversation_history.append({"role": "assistant", "content": response.content})
+
+        if not tool_uses:
+            return final_response, conversation_history
+
+        tool_results = []
+        for tool_block in tool_uses:
+            result = execute_tool(
+                tool_block["name"], tool_block["input"],
+                dispatcher=dispatcher, list_devices=list_devices,
+                device_id=device_id,
+            )
+            if on_tool_call:
+                on_tool_call(tool_block["name"], tool_block["input"], result)
+            tool_results.append({
+                "type": "tool_result",
+                "tool_use_id": tool_block["id"],
+                "content": result,
+            })
         conversation_history.append({"role": "user", "content": tool_results})
 
     if not final_response:

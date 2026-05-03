@@ -30,14 +30,23 @@ from branding import (
     resolve_ui_file,
     sync_env_aliases,
 )
-from server.orchestrator import process_request
+from server.orchestrator import process_request, process_request_streaming
 from server.trading.routes import router as trading_router
+from server import session_store
+from server.scheduler import SCHEDULER, setup_default_jobs
+from server import confirm
+from server import audit
+from server import panic
+from server import rate_limit
+from server import auth
 
 load_dotenv()
 sync_env_aliases()
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 TRADING_UI_FILE = ROOT_DIR / TRADING_UI_FILE_NAME
+VOICE_UI_FILE = ROOT_DIR / "voice_ui.html"   # legacy fallback
+FRONTEND_DIST = ROOT_DIR / "frontend" / "dist"
 ASSETS_DIR = ROOT_DIR / "assets"
 
 SECRET_TOKEN = get_env("SECRET_TOKEN", DEFAULT_SECRET_TOKEN)
@@ -46,8 +55,108 @@ RPC_TIMEOUT = float(get_env("RPC_TIMEOUT", "60"))
 app = FastAPI(title=f"{APP_NAME} Server", version="2.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.mount("/assets", StaticFiles(directory=ASSETS_DIR, check_dir=False), name="assets")
+
+# Sert le bundle React produit par `npm run build` côté frontend.
+# Le bundle est buildé avec base="/voice/", donc les assets sont sous /voice/assets/.
+# Le même index.html est servi pour `/` (chat principal) et `/voice` (mode immersif),
+# et le routing est géré côté React via window.location.pathname.
+if (FRONTEND_DIST / "assets").exists():
+    app.mount(
+        "/voice/assets",
+        StaticFiles(directory=FRONTEND_DIST / "assets", check_dir=False),
+        name="voice_assets",
+    )
+
 app.include_router(trading_router)
 security = HTTPBearer()
+
+
+@app.on_event("startup")
+async def _on_startup():
+    """Démarre le scheduler de tâches récurrentes (briefing matinal, etc.)
+    + branche le système de confirmation par mot de passe."""
+    # Mémorise la boucle async principale pour permettre aux callbacks venant
+    # d'autres threads (scheduler / confirm) d'envoyer des messages WebSocket.
+    app.state.main_loop = asyncio.get_running_loop()
+    setup_default_jobs()
+    SCHEDULER.start()
+
+    # Callback pour pousser les demandes de confirmation au client WebSocket
+    def _push_confirm(device_id: str, payload: dict) -> bool:
+        session = controllers.get(device_id)
+        ws = session.get("ws") if session else None
+        if ws is None:
+            return False
+        try:
+            asyncio.run_coroutine_threadsafe(
+                ws.send_json(payload), app.state.main_loop
+            ).result(timeout=2)
+            return True
+        except Exception:
+            return False
+    confirm.set_push_callback(_push_confirm)
+    cfg = confirm.status()
+    if cfg["enabled"]:
+        print(f"[confirm] Activé : {cfg['tools_count']} tools sous gating "
+              f"(timeout={cfg['timeout_sec']}s, cache={cfg['cache_sec']}s).")
+    else:
+        print("[confirm] DÉSACTIVÉ : ORION_CONFIRM_PASSWORD non défini "
+              "→ aucun tool n'est protégé par mot de passe.")
+
+    # ─── Hook d'alerte audit (broadcast UI + toast système + ntfy.sh) ──
+    def _audit_alert(row: dict):
+        """Appelé après chaque tool sensible. Best-effort, jamais bloquant."""
+        # 1. Broadcast WebSocket à toutes les UI ouvertes
+        payload = {"type": "audit_alert", **{k: v for k, v in row.items() if k != "id"}}
+        for did, sess in list(controllers.items()):
+            ws = sess.get("ws")
+            if ws is None:
+                continue
+            try:
+                asyncio.run_coroutine_threadsafe(
+                    ws.send_json(payload), app.state.main_loop,
+                ).result(timeout=1)
+            except Exception:
+                pass
+
+        # 2. Toast Windows local (si winotify dispo)
+        try:
+            from winotify import Notification
+            ok = "✓" if row.get("success") else "✗"
+            confirmed = " [conf]" if row.get("confirmed") else ""
+            Notification(
+                app_id="Orion",
+                title=f"Orion · action sensible {ok}{confirmed}",
+                msg=f"{row.get('tool_name', '?')} · {row.get('device_id', '?')}",
+                duration="short",
+            ).show()
+        except Exception:
+            pass  # winotify pas dispo ou non-Windows
+
+        # 3. ntfy.sh push (optionnel, si ORION_NTFY_TOPIC défini)
+        topic = (get_env("NTFY_TOPIC") or "").strip()
+        if topic:
+            ntfy_url = (get_env("NTFY_SERVER") or "https://ntfy.sh").rstrip("/")
+            try:
+                import httpx
+                httpx.post(
+                    f"{ntfy_url}/{topic}",
+                    data=(f"{row.get('tool_name', '?')} sur {row.get('device_id', '?')}"
+                          f" {'OK' if row.get('success') else 'ERR: ' + (row.get('error') or '')}").encode(),
+                    headers={
+                        "Title": "Orion · action sensible",
+                        "Tags": "shield" if row.get("confirmed") else "warning",
+                        "Priority": "default" if row.get("success") else "high",
+                    },
+                    timeout=3.0,
+                )
+            except Exception as exc:
+                print(f"[ntfy!] {exc}")
+
+    audit.set_alert_hook(_audit_alert)
+    if audit._enabled():
+        print(f"[audit] Activé · {audit.db_size_kb()} KB en base · "
+              f"max {audit._max_rows()} entrées.")
 
 # Sessions controllers : {device_id: {"history": [...], "ws": WebSocket}}
 controllers: dict = {}
@@ -76,16 +185,37 @@ async def broadcast_voice_state(payload: dict, exclude_device: str | None = None
 
 
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    if credentials.credentials != SECRET_TOKEN:
+    """Vérifie un token de scope ADMIN (pour les endpoints HTTP /devices, /audit, etc.)."""
+    if not auth.verify(auth.ADMIN, credentials.credentials):
         raise HTTPException(status_code=401, detail="Token invalide")
     return credentials.credentials
 
 
 @app.get("/")
+@app.get("/orion")
+def serve_ui():
+    """Sert l'UI Orion (chat principal) — bundle React si dispo, sinon HTML legacy."""
+    react_index = FRONTEND_DIST / "index.html"
+    if react_index.exists():
+        return FileResponse(
+            react_index,
+            media_type="text/html",
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+        )
+    ui_file = resolve_ui_file(ROOT_DIR)
+    if ui_file.exists():
+        return FileResponse(ui_file, media_type="text/html")
+    return JSONResponse(
+        {"error": "Ni frontend/dist/index.html ni orion_ui.html trouvés. "
+                  "Build le frontend avec : cd frontend && npm run build"},
+        status_code=404,
+    )
+
+
 @app.get("/orion_ui.html")
 @app.get(f"/{LEGACY_UI_FILE_NAME}", include_in_schema=False)
-def serve_ui():
-    """Sert l'UI Orion directement. Accessible depuis n'importe quel navigateur."""
+def serve_ui_legacy():
+    """Ancienne UI HTML (fallback / debug). À supprimer quand React est validé."""
     ui_file = resolve_ui_file(ROOT_DIR)
     if ui_file.exists():
         return FileResponse(ui_file, media_type="text/html")
@@ -94,7 +224,14 @@ def serve_ui():
 
 @app.get("/trading")
 def serve_trading_ui():
-    """Sert le dashboard de trading. no-cache pour faciliter les updates UI."""
+    """Sert le dashboard de trading — bundle React si dispo, sinon HTML legacy."""
+    react_index = FRONTEND_DIST / "index.html"
+    if react_index.exists():
+        return FileResponse(
+            react_index,
+            media_type="text/html",
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+        )
     if TRADING_UI_FILE.exists():
         return FileResponse(
             TRADING_UI_FILE,
@@ -102,9 +239,50 @@ def serve_trading_ui():
             headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
         )
     return JSONResponse(
-        {"error": "trading_dashboard.html introuvable à la racine du projet"},
+        {"error": "Ni frontend/dist/index.html ni trading_dashboard.html trouvés."},
         status_code=404,
     )
+
+
+@app.get("/trading_legacy")
+def serve_trading_ui_legacy():
+    """Ancienne UI Trading HTML (fallback / debug). À supprimer après validation React."""
+    if TRADING_UI_FILE.exists():
+        return FileResponse(TRADING_UI_FILE, media_type="text/html")
+    return JSONResponse({"error": "trading_dashboard.html introuvable"}, status_code=404)
+
+
+@app.get("/voice")
+@app.get("/voice_ui.html", include_in_schema=False)
+def serve_voice_ui():
+    """Sert l'UI Voice React (frontend/dist/index.html).
+    Fallback sur l'ancien voice_ui.html si le bundle React n'est pas buildé."""
+    react_index = FRONTEND_DIST / "index.html"
+    if react_index.exists():
+        return FileResponse(
+            react_index,
+            media_type="text/html",
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+        )
+    if VOICE_UI_FILE.exists():
+        return FileResponse(
+            VOICE_UI_FILE,
+            media_type="text/html",
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+        )
+    return JSONResponse(
+        {"error": "Ni frontend/dist/index.html ni voice_ui.html trouvés. "
+                  "Build le frontend avec : cd frontend && npm run build"},
+        status_code=404,
+    )
+
+
+@app.get("/voice_legacy")
+def serve_voice_ui_legacy():
+    """Ancienne UI voice HTML (au cas où). À supprimer quand React est validé."""
+    if VOICE_UI_FILE.exists():
+        return FileResponse(VOICE_UI_FILE, media_type="text/html")
+    return JSONResponse({"error": "voice_ui.html introuvable"}, status_code=404)
 
 
 @app.get("/status")
@@ -114,7 +292,75 @@ def status():
         "controllers": list(controllers.keys()),
         "workers": [{"id": did, **w["info"]} for did, w in workers.items()],
         "voice": voice_states,
+        "panic": panic.details(),
+        "rate_limit": rate_limit.status(),
+        "confirm": {"enabled": confirm._enabled()},
+        "audit_db_kb": audit.db_size_kb(),
     }
+
+
+async def _broadcast_panic(state: dict):
+    """Envoie l'état panic à toutes les UI ouvertes."""
+    payload = {"type": "panic_state", **state}
+    for did, sess in list(controllers.items()):
+        ws = sess.get("ws")
+        if ws is None:
+            continue
+        try:
+            await ws.send_json(payload)
+        except Exception:
+            pass
+
+
+@app.post("/api/panic")
+async def api_panic_trigger(token: str | None = None, reason: str | None = None,
+                             by: str | None = None):
+    """Active le mode panic : kill switch global."""
+    if not auth.verify(auth.ADMIN, token):
+        raise HTTPException(status_code=401, detail="Token invalide")
+    state = panic.trigger(reason=reason or "via /api/panic", by_device=by or "?")
+    print(f"[PANIC ⚠] Activé par {by or '?'} : {reason or '(sans raison)'}")
+
+    # Déconnecte tous les workers (par sécurité, ils ne pourront plus exécuter)
+    for did, w in list(workers.items()):
+        ws = w.get("ws")
+        if ws:
+            try:
+                await ws.close(code=4002, reason="Mode panic")
+            except Exception:
+                pass
+            workers[did]["ws"] = None
+
+    # Stoppe le scheduler (plus de briefing automatique pendant le panic)
+    try:
+        SCHEDULER.stop()
+    except Exception:
+        pass
+
+    # Audit + broadcast
+    audit.log_tool_call(
+        device_id=by or "panic_endpoint", tool_name="_panic_trigger",
+        tool_input={"reason": reason or ""}, success=True,
+        duration_ms=0, sensitive=True, confirmed=True,
+    )
+    await _broadcast_panic(state)
+    return state
+
+
+@app.post("/api/panic/release")
+async def api_panic_release(token: str | None = None):
+    """Désactive le mode panic."""
+    if not auth.verify(auth.ADMIN, token):
+        raise HTTPException(status_code=401, detail="Token invalide")
+    state = panic.release()
+    print("[PANIC ✓] Désactivé.")
+    audit.log_tool_call(
+        device_id="panic_endpoint", tool_name="_panic_release",
+        tool_input={}, success=True, duration_ms=0,
+        sensitive=True, confirmed=True,
+    )
+    await _broadcast_panic({"active": False})
+    return state
 
 
 @app.get("/devices")
@@ -122,6 +368,34 @@ def list_devices_http(token: str = Depends(verify_token)):
     return {
         "controllers": [{"id": did, "history_len": len(s["history"])} for did, s in controllers.items()],
         "workers": [{"id": did, **w["info"]} for did, w in workers.items()],
+    }
+
+
+@app.get("/api/audit")
+def api_audit(
+    token: str | None = None,
+    limit: int = 50,
+    hours: float = 24.0,
+    sensitive_only: bool = False,
+    failed_only: bool = False,
+    device_id: str | None = None,
+):
+    """Visualise l'audit log dans le navigateur. Ex:
+       /api/audit?token=XXX&limit=50&hours=24&sensitive_only=true"""
+    if not auth.verify(auth.ADMIN, token):
+        raise HTTPException(status_code=401, detail="Token invalide")
+    import time as _time
+    since = _time.time() - max(0.1, float(hours)) * 3600
+    items = audit.get_recent(
+        limit=int(limit),
+        sensitive_only=bool(sensitive_only),
+        failed_only=bool(failed_only),
+        device_id=device_id,
+        since_ts=since,
+    )
+    return {
+        "stats": audit.get_stats(since_ts=since),
+        "items": items,
     }
 
 
@@ -135,7 +409,7 @@ async def api_transcribe(request: Request, token: str | None = None, language: s
 
     Auth : ?token=... en query string (cohérent avec /ws/...).
     """
-    if token != SECRET_TOKEN:
+    if not auth.verify(auth.ADMIN, token):
         raise HTTPException(status_code=401, detail="Token invalide")
 
     blob = await request.body()
@@ -221,7 +495,8 @@ def list_workers_info():
 @app.websocket("/ws/worker/{device_id}")
 async def worker_endpoint(websocket: WebSocket, device_id: str):
     token = websocket.query_params.get("token", "")
-    if token != SECRET_TOKEN:
+    # Le worker doit avoir au minimum le scope WORKER (ADMIN passe aussi)
+    if not auth.verify(auth.WORKER, token):
         await websocket.close(code=4001, reason="Token invalide")
         return
     await websocket.accept()
@@ -275,13 +550,17 @@ async def worker_endpoint(websocket: WebSocket, device_id: str):
 @app.websocket("/ws/{device_id}")
 async def controller_endpoint(websocket: WebSocket, device_id: str):
     token = websocket.query_params.get("token", "")
-    if token != SECRET_TOKEN:
+    # Le controller doit avoir au minimum le scope USER (ADMIN passe aussi)
+    if not auth.verify(auth.USER, token):
         await websocket.close(code=4001, reason="Token invalide")
         return
     await websocket.accept()
 
     if device_id not in controllers:
-        controllers[device_id] = {"history": [], "ws": websocket}
+        # Premier connect de ce device dans cette session serveur :
+        # restore l'historique persistant depuis SQLite (peut être vide)
+        persisted = session_store.load_history(device_id)
+        controllers[device_id] = {"history": persisted, "ws": websocket}
     else:
         controllers[device_id]["ws"] = websocket
     session = controllers[device_id]
@@ -331,18 +610,52 @@ async def controller_endpoint(websocket: WebSocket, device_id: str):
 
                 dispatcher = make_dispatcher(loop)
 
-                try:
-                    response, session["history"] = await loop.run_in_executor(
-                        None,
-                        lambda: process_request(
-                            user_input,
-                            session["history"],
-                            on_tool_call=on_tool,
-                            dispatcher=dispatcher,
-                            list_devices=list_workers_info,
-                            device_id=device_id,
-                        ),
+                # Streaming activé par défaut. L'UI peut désactiver en envoyant
+                # {"type": "message", "stream": false, ...}
+                use_stream = data.get("stream", True)
+
+                def on_text_delta(text):
+                    fut = asyncio.run_coroutine_threadsafe(
+                        websocket.send_json({"type": "response_chunk", "text": text}),
+                        loop,
                     )
+                    try:
+                        fut.result(timeout=2)
+                    except Exception:
+                        pass
+
+                try:
+                    if use_stream:
+                        response, session["history"] = await loop.run_in_executor(
+                            None,
+                            lambda: process_request_streaming(
+                                user_input,
+                                session["history"],
+                                on_text_delta=on_text_delta,
+                                on_tool_call=on_tool,
+                                dispatcher=dispatcher,
+                                list_devices=list_workers_info,
+                                device_id=device_id,
+                            ),
+                        )
+                    else:
+                        response, session["history"] = await loop.run_in_executor(
+                            None,
+                            lambda: process_request(
+                                user_input,
+                                session["history"],
+                                on_tool_call=on_tool,
+                                dispatcher=dispatcher,
+                                list_devices=list_workers_info,
+                                device_id=device_id,
+                            ),
+                        )
+                    try:
+                        session_store.save_history(device_id, session["history"])
+                    except Exception as exc:
+                        print(f"[session_store!] {exc}")
+                    # Le 'response' final contient le texte complet ; l'UI peut s'en
+                    # servir pour reconstruire si elle a manqué des chunks.
                     await websocket.send_json({"type": "response", "content": response})
                 except Exception as e:
                     # Erreur API (crédit insuffisant, rate limit, modèle invalide…) :
@@ -353,6 +666,10 @@ async def controller_endpoint(websocket: WebSocket, device_id: str):
 
             elif msg_type == "clear_history":
                 session["history"] = []
+                try:
+                    session_store.clear_history(device_id)
+                except Exception as exc:
+                    print(f"[session_store!] {exc}")
                 await websocket.send_json({"type": "info", "message": "Historique effacé."})
 
             elif msg_type == "voice_state":
@@ -364,6 +681,25 @@ async def controller_endpoint(websocket: WebSocket, device_id: str):
                     {"type": "voice_state", "device_id": device_id, "state": state},
                     exclude_device=device_id,
                 )
+
+            elif msg_type == "confirm_response":
+                # Réponse à un confirm_request : accepter (avec password) ou refuser
+                req_id = data.get("request_id", "")
+                password = data.get("password", "")
+                refused = data.get("refused", False)
+                if refused:
+                    result = confirm.deny(req_id)
+                else:
+                    result = confirm.resolve(req_id, password)
+                # Echo discret pour l'UI (utilisé pour rejouer le modal en cas de mauvais pwd)
+                try:
+                    await websocket.send_json({
+                        "type": "confirm_result",
+                        "request_id": req_id,
+                        **result,
+                    })
+                except Exception:
+                    pass
 
             elif msg_type == "unlock_request":
                 # Demande de déverrouillage du password gate des UI navigateur.

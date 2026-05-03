@@ -1,0 +1,22 @@
+name = "ollama"
+description = "Cerveau 100% local via Ollama (offline, zéro coût, pas de clé API)"
+
+[env]
+ORION_PROVIDER = "ollama"
+ORION_OLLAMA_HOST = "http://localhost:11434"
+ORION_OLLAMA_MODEL = "llama3.3:70b-instruct-q2_K"
+
+[notes]
+required_secrets = ["ORION_SECRET_TOKEN"]
+post_setup = [
+    "Installe Ollama : https://ollama.com/download",
+    "Démarre le service : ollama serve  (laisse tourner en fond)",
+    "Télécharge un modèle qui supporte les tools :",
+    "  - Rapide : ollama pull llama3.1:8b  (~5 GB)",
+    "  - Top tools : ollama pull qwen2.5:14b  (~9 GB)",
+    "  - Maximum : ollama pull llama3.3:70b-instruct-q2_K  (~26 GB, lent en CPU)",
+    "Vérifie : ollama list",
+    "Lance : python start.py server",
+    "Note : tool calling Ollama est moins fiable que Claude/Gemini.",
+    "       Si Orion oublie d'appeler des tools, repasse temporairement sur anthropic.",
+]
